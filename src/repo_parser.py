@@ -37,7 +37,10 @@ def get_code_files(repo_path: str) -> List[Dict[str, str]]:
     # Walk through all directories and files in the repo path
     for root, dirs, files in os.walk(repo_path_obj):
         # Modify dirs in-place to skip ignored directories (optimization for os.walk)
-        dirs[:] = [d for d in dirs if d not in IGNORED_DIRS]
+        # Using clear() + extend() instead of slice assignment to keep type checkers happy
+        filtered = [d for d in dirs if d not in IGNORED_DIRS]
+        dirs.clear()
+        dirs.extend(filtered)
             
         for file in files:
             file_path = Path(root) / file
@@ -66,12 +69,17 @@ def get_code_files(repo_path: str) -> List[Dict[str, str]]:
     return code_files
 
 if __name__ == "__main__":
-    # Example usage: Scan the current project directory's parent directory
-    # Assuming this file is in `src/`, its parent is the project root `ai-github-repository-brain/`
-    current_repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # Use Path.resolve() for reliable, absolute path resolution on all platforms.
+    # This file lives at `src/repo_parser.py`, so .parent gives `src/` and
+    # .parent.parent gives the project root.
+    current_repo = Path(__file__).resolve().parent.parent
     print(f"Testing repo_parser on: {current_repo}\n")
     
-    files = get_code_files(current_repo)
+    if not current_repo.exists():
+        print(f"ERROR: Resolved path does not exist: {current_repo}")
+        exit(1)
+
+    files = get_code_files(str(current_repo))
     
     if files:
         print(f"\nFound {len(files)} supported files. Showing the first one:")
@@ -79,7 +87,8 @@ if __name__ == "__main__":
         print(f"Path: {first_file['path']}")
         
         # Display a short preview of the file content
-        preview_length = min(300, len(first_file['content']))
-        print(f"Content snippet (first {preview_length} characters):\n{'-'*40}\n{first_file['content'][:preview_length]}\n{'-'*40}\n")
+        content: str = first_file['content']
+        preview_length = min(300, len(content))
+        print(f"Content snippet (first {preview_length} characters):\n{'-'*40}\n{content[:preview_length]}\n{'-'*40}\n")  # type: ignore[index]
     else:
         print("No supported code files found in the repository.")
