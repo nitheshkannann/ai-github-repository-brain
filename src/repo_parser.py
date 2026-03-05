@@ -10,7 +10,20 @@ logger = logging.getLogger(__name__)
 SUPPORTED_EXTENSIONS = {'.py', '.js', '.cpp', '.ts', '.java'}
 
 # Standard directories to ignore when scanning
-IGNORED_DIRS = {'.git', 'node_modules', 'venv', 'env', '__pycache__', '.pytest_cache', 'dist', 'build'}
+IGNORED_DIRS = {
+    ".git",
+    ".venv",
+    "venv",
+    "__pycache__",
+    "node_modules",
+    "dist",
+    "build",
+    "site-packages",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".idea",
+    ".vscode"
+}
 
 def get_code_files(repo_path: str) -> List[Dict[str, str]]:
     """
@@ -31,6 +44,7 @@ def get_code_files(repo_path: str) -> List[Dict[str, str]]:
         raise ValueError(f"Invalid repository path: {repo_path}")
         
     code_files = []
+    ignored_dir_count = 0
     
     logger.info(f"Scanning repository at '{repo_path}' for files with extensions: {', '.join(SUPPORTED_EXTENSIONS)}")
     
@@ -38,11 +52,21 @@ def get_code_files(repo_path: str) -> List[Dict[str, str]]:
     for root, dirs, files in os.walk(repo_path_obj):
         # Modify dirs in-place to skip ignored directories (optimization for os.walk)
         # Using clear() + extend() instead of slice assignment to keep type checkers happy
-        filtered = [d for d in dirs if d not in IGNORED_DIRS]
+        filtered = []
+        for d in dirs:
+            if d in IGNORED_DIRS or d.startswith('.'):
+                ignored_dir_count += 1
+            else:
+                filtered.append(d)
+                
         dirs.clear()
         dirs.extend(filtered)
             
         for file in files:
+            # Skip hidden files
+            if file.startswith('.'):
+                continue
+                
             file_path = Path(root) / file
             
             # Check if the file has a supported extension
@@ -65,7 +89,7 @@ def get_code_files(repo_path: str) -> List[Dict[str, str]]:
                 except Exception as e:
                     logger.warning(f"Could not read file {file_path}: {e}")
                     
-    logger.info(f"Successfully loaded {len(code_files)} code files.")
+    logger.info(f"Successfully loaded {len(code_files)} code files. Ignored {ignored_dir_count} directories.")
     return code_files
 
 if __name__ == "__main__":
