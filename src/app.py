@@ -16,8 +16,10 @@ import sys
 import argparse
 import logging
 import numpy as np
+import os
 from pathlib import Path
 from typing import List, Dict
+from dotenv import load_dotenv
 
 # ── Make sure sibling modules in src/ are importable ──────────────────────────
 src_dir = str(Path(__file__).resolve().parent)
@@ -28,9 +30,13 @@ from repo_parser import get_code_files           # type: ignore[import]
 from chunker import chunk_code_files             # type: ignore[import]
 from embedder import load_model, generate_embeddings  # type: ignore[import]
 from retriever import FAISSRetriever             # type: ignore[import]
+import litellm
 
 # Only show WARNING+ from libraries so our own prints stay clean
 logging.basicConfig(level=logging.WARNING)
+# Suppress noisy litellm info logs
+litellm.suppress_debug_info = True 
+
 logger = logging.getLogger(__name__)
 
 
@@ -86,8 +92,8 @@ def answer_query(
     top_k: int
 ) -> None:
     """
-    Embeds the query, retrieves the top-k chunks from FAISS, and pretty-prints
-    the results to the terminal.
+    Embeds the query, retrieves the top-k chunks from FAISS, generates an LLM
+    explanation using the context, and pretty-prints the results.
     """
     # Embed the query with the same model used for the chunks
     query_vec: np.ndarray = model.encode(
@@ -100,7 +106,69 @@ def answer_query(
         print("\n  (No results found)\n")
         return
 
-    print(f"\n{'─'*60}")
+    # 1. Combine retrieved chunks into a context string
+    context_blocks = []
+    for rank, chunk in enumerate(results, start=1):
+        context_blocks.append(
+            f"--- Code Section {rank} ---\n"
+            f"File: {chunk['file_path']}\n"
+            f"Content:\n{chunk['content']}\n"
+        )
+    context_str = "\n".join(context_blocks)
+
+    # 2. Build the LLM prompt
+    sys_prompt = "You are a helpful coding assistant. Using the following code context, explain the answer to the user's question."
+    user_prompt = f"Context:\n{context_str}\n\nQuestion: {query}"
+
+    # 3. Call the LLM (Using a free/default model for testing if no key is set, or let litellm handle it)
+    print("\n  🤖 Thinking...\n")
+    try:
+        models_to_try = [
+            "gemini/gemini-2.5-flash",
+            "gemini/gemini-2.5-pro",
+            "gemini/gemini-2.0-flash",
+            "gemini/gemini-1.5-flash",
+            "gemini/gemini-1.5-flash-latest",
+            "gemini/gemini-1.5-pro",
+            "gemini/gemini-1.5-pro-latest",
+            "gemini/gemini-1.5-flash-001",
+            "gemini/gemini-1.5-flash-002",
+            "gemini/gemini-pro"
+        ]
+        explanation = None
+        last_error = None
+        
+        for model_name in models_to_try:
+            try:
+                response = litellm.completion(
+                    model=model_name,
+                    messages=[
+                        {"role": "system", "content": sys_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ]
+                )
+                explanation = response.choices[0].message.content
+                break
+            except Exception as e:
+                last_error = e
+                continue
+
+        if not explanation:
+            explanation = f"[LLM Error: {last_error}]\nMake sure you have set a valid GEMINI_API_KEY in the .env file."
+    except Exception as e:
+        explanation = f"[Unhandled LLM Error: {e}]"
+
+    # 4. Print the LLM explanation
+    print(f"{'─'*60}")
+    print("  ✨ Explanation:")
+    print(f"{'─'*60}\n")
+    # indent the explanation
+    for line in explanation.splitlines():
+        print(f"  {line}")
+    print()
+
+    # 5. Print the raw code references
+    print(f"{'─'*60}")
     print(f"  Top {len(results)} relevant code section(s):")
     print(f"{'─'*60}\n")
 
@@ -150,6 +218,12 @@ def main() -> None:
     args = parse_args()
     repo_path = args.repo
     top_k     = args.top_k
+
+    load_dotenv()
+    if not os.environ.get("GEMINI_API_KEY"):
+        print("❌ Gemini API key not found. Please add GEMINI_API_KEY to your .env file.")
+        sys.exit(1)
+    print("✓ Gemini API key loaded successfully")
 
     # ── Banner ────────────────────────────────────────────────────────────────
     print("\n" + "=" * 60)
