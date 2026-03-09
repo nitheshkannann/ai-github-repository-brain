@@ -1,206 +1,265 @@
-🧠 AI GitHub Repository Brain
+<div align="center">
 
-An AI-powered codebase assistant that lets you ask natural-language questions about a repository and receive intelligent explanations based on the actual source code.
+# 🧠 AI GitHub Repository Brain
 
-This project implements a Retrieval-Augmented Generation (RAG) architecture to analyze codebases, retrieve relevant code snippets, and generate human-readable explanations using modern AI models.
+### Ask natural language questions about any codebase — powered by RAG, FAISS, and Gemini AI
 
-🚀 Features
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.111+-009688?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Next.js](https://img.shields.io/badge/Next.js-14-000000?style=flat&logo=next.js&logoColor=white)](https://nextjs.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-🔎 Semantic Code Search – Ask questions about the codebase in plain English.
+</div>
 
-🧩 Automatic Code Chunking – Splits files into manageable chunks for embeddings.
+---
 
-🧠 Vector Embeddings – Uses a transformer model to convert code into semantic vectors.
+## 📖 Description
 
-⚡ FAISS Vector Database – Enables fast similarity search across the codebase.
+**AI GitHub Repository Brain** is a full-stack AI application that lets you explore any local codebase through natural language. Point it at a repository, ask questions like *"How does the authentication system work?"* or *"Explain the chunking logic"*, and get precise answers backed by the actual source code.
 
-🤖 LLM Explanations – Uses Gemini to generate natural-language explanations.
+Under the hood it builds a **RAG (Retrieval-Augmented Generation)** pipeline:
+- Parses and semantically chunks every source file
+- Generates vector embeddings and stores them in a **FAISS** index
+- Retrieves the most relevant code sections per query
+- Feeds them as context to **Google Gemini** for a grounded, accurate explanation
 
-💬 Interactive CLI Interface – Chat with your repository directly from the terminal.
+---
 
-🏗 Architecture
+## 🖥️ Demo
 
-This project uses a RAG (Retrieval-Augmented Generation) pipeline:
+> **Chat UI — Ask questions, get AI explanations with code snippets**
 
+![Chat UI showing AI response with code snippet cards](./docs/demo.png)
+
+---
+
+## ✨ Features
+
+| Feature | Detail |
+|---|---|
+| 🔍 Semantic Code Search | Embedding-based similarity — finds relevant code even without exact keyword matches |
+| 🤖 Gemini LLM Explanations | Grounded answers using retrieved source code as context |
+| ⚡ FAISS Vector Index | Sub-millisecond nearest-neighbour retrieval at any repo scale |
+| 💬 Chat Interface | Conversational Q&A with message history and syntax-highlighted code cards |
+| 🎛️ Adjustable Top-K | Tune how many code sections the LLM sees per query |
+| 🌗 Dark Developer UI | ChatGPT-style dark theme built with Next.js + Tailwind CSS |
+| 🔌 REST API | Clean FastAPI backend — swap any frontend or call it from scripts |
+
+---
+
+## 🏗️ System Architecture
+
+```
 User Question
-      ↓
-Query Embedding
-      ↓
-Vector Search (FAISS)
-      ↓
-Relevant Code Chunks
-      ↓
-LLM (Gemini)
-      ↓
-Human-readable Explanation
-System Flow
-Repository
-   │
-   ▼
-repo_parser.py
-   │
-   ▼
-chunker.py
-   │
-   ▼
-embedder.py
-   │
-   ▼
-FAISS Vector Index
-   │
-   ▼
-retriever.py
-   │
-   ▼
-app.py (CLI Interface)
-   │
-   ▼
-Gemini LLM Explanation
-📂 Project Structure
-ai-github-repository-brain
+      │
+      ▼
+┌─────────────────────┐
+│   Next.js Frontend  │  ← Chat UI, Sidebar, Code viewer
+└────────┬────────────┘
+         │  POST /ask
+         ▼
+┌─────────────────────┐
+│  FastAPI Backend    │
+│  (src/api.py)       │
+└────────┬────────────┘
+         │
+    ┌────┴──────────────────────────┐
+    │       RAG Pipeline            │
+    │                               │
+    │  repo_parser.py               │
+    │    → Scan & filter code files │
+    │  chunker.py                   │
+    │    → Split into text chunks   │
+    │  embedder.py                  │
+    │    → sentence-transformers    │
+    │       (all-MiniLM-L6-v2)      │
+    │  retriever.py                 │
+    │    → FAISS similarity search  │
+    └────────────┬──────────────────┘
+                 │ Top-K chunks
+                 ▼
+         ┌───────────────┐
+         │  Gemini LLM   │  ← gemini-2.0-flash / 1.5-flash
+         └───────┬───────┘
+                 │
+                 ▼
+      Answer + Code Snippets
+```
+
+---
+
+## 🛠️ Tech Stack
+
+**Backend**
+- [Python 3.10+](https://python.org)
+- [FastAPI](https://fastapi.tiangolo.com) — REST API framework
+- [Sentence Transformers](https://www.sbert.net) — `all-MiniLM-L6-v2` embeddings
+- [FAISS](https://faiss.ai) — vector similarity search
+- [LiteLLM](https://litellm.ai) — unified LLM interface
+- [Google Gemini](https://ai.google.dev) — LLM for code explanation
+
+**Frontend**
+- [Next.js 14](https://nextjs.org) (App Router)
+- [React](https://react.dev) + [TypeScript](https://typescriptlang.org)
+- [Tailwind CSS](https://tailwindcss.com)
+- [react-syntax-highlighter](https://github.com/react-syntax-highlighter/react-syntax-highlighter)
+- [Lucide Icons](https://lucide.dev)
+
+---
+
+## 📂 Project Structure
+
+```
+ai-github-repository-brain/
 │
 ├── src/
-│   ├── app.py           # Main CLI application
-│   ├── repo_parser.py   # Repository scanning
-│   ├── chunker.py       # Code chunking logic
-│   ├── embedder.py      # Embedding generation
-│   └── retriever.py     # FAISS vector search
+│   ├── api.py          # FastAPI app — /load_repo, /ask endpoints
+│   ├── repo_parser.py  # Scan repository, collect source files
+│   ├── chunker.py      # Split files into overlapping text chunks
+│   ├── embedder.py     # Generate sentence-transformer embeddings
+│   └── retriever.py    # FAISS index build + similarity search
 │
-├── data/                # Optional stored embeddings/index
-├── colab/               # Colab experiments
+├── frontend/
+│   ├── app/
+│   │   ├── layout.tsx
+│   │   └── page.tsx        # Root page
+│   ├── components/
+│   │   ├── Sidebar.tsx     # Repo path input, Top-K slider, Load button
+│   │   ├── Chat.tsx        # Chat bubbles + loading indicator
+│   │   └── CodeBlock.tsx   # Expandable syntax-highlighted snippet card
+│   ├── lib/
+│   │   └── api.ts          # Typed fetch wrappers for the REST API
+│   ├── package.json
+│   └── next.config.ts
 │
+├── data/
+├── .env.example        # API key template
 ├── requirements.txt
-├── README.md
-└── .env.example
-⚙️ Installation
+└── README.md
+```
 
-Clone the repository:
+---
 
-git clone https://github.com/yourusername/ai-github-repository-brain.git
+## ⚙️ Installation
+
+### Prerequisites
+- Python 3.10+
+- Node.js 18+
+- A [Google Gemini API key](https://aistudio.google.com/app/apikey)
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/your-username/ai-github-repository-brain.git
 cd ai-github-repository-brain
+```
 
-Create a virtual environment:
+### 2. Set up the Python environment
 
+```bash
 python -m venv .venv
 
-Activate it:
-
-Windows:
-
+# Windows
 .venv\Scripts\activate
 
-Install dependencies:
+# macOS / Linux
+source .venv/bin/activate
 
 pip install -r requirements.txt
-🔑 Setup API Key
+```
 
-Create a .env file:
+### 3. Configure your API key
 
-GEMINI_API_KEY=your_api_key_here
+```bash
+cp .env.example .env
+```
 
-You can obtain a key from:
+Open `.env` and add your key:
 
-https://aistudio.google.com/app/apikey
+```env
+GEMINI_API_KEY=your_gemini_api_key_here
+```
 
-▶️ Running the Application
+### 4. Install frontend dependencies
 
-Start the AI assistant:
+```bash
+cd frontend
+npm install
+cd ..
+```
 
-python src/app.py
+---
 
-Example interaction:
+## 🚀 Running the Application
 
-You: Explain the architecture of this repository
+You need **two terminals** running simultaneously.
 
-Output:
+### Terminal 1 — Backend
 
-✨ Explanation:
+```bash
+# From the project root, with venv activated
+uvicorn src.api:app --reload --port 8000
+```
 
-This repository implements a Retrieval-Augmented Generation system
-for understanding GitHub repositories.
+The API will be available at `http://localhost:8000`.  
+Interactive docs: `http://localhost:8000/docs`
 
-Key components include:
-- repo_parser.py
-- chunker.py
-- embedder.py
-- retriever.py
-- app.py
-🧪 Example Query
-You: How does the FAISS retriever work?
+### Terminal 2 — Frontend
 
-The system will:
+```bash
+cd frontend
+npm run dev
+```
 
-Embed your question
+Open **http://localhost:3000** in your browser.
 
-Retrieve the most relevant code chunks
+---
 
-Send them to the LLM
+## 💡 Example Usage
 
-Generate an explanation
+1. **Load a repository** — paste any local path into the sidebar (e.g. `C:\Users\you\my-project`) and click **Load Repository**. The RAG pipeline runs once and builds the FAISS index.
 
-🛠 Technologies Used
+2. **Ask questions** — type in the chat and press Enter:
 
-Python
+   > *"How does the embedder generate vectors?"*  
+   > *"What does the repo_parser filter out?"*  
+   > *"Explain the FAISS retrieval process."*  
+   > *"Where is the Gemini API called?"*
 
-FAISS
+3. **View source code** — each answer includes collapsible code snippet cards showing the exact file sections the AI used, with file name, chunk ID, and similarity score.
 
-Sentence Transformers
+---
 
-LiteLLM
+## 🚧 Future Improvements
 
-Gemini API
+- [ ] Persistent FAISS index (save/load to disk — no re-indexing on restart)
+- [ ] Multi-repo support — switch between indexed repositories
+- [ ] Streaming LLM responses (Server-Sent Events)
+- [ ] GitHub URL support — clone and index remote repos directly
+- [ ] Session history — save and restore past Q&A sessions
+- [ ] Re-ranking with cross-encoder models for higher precision
+- [ ] Docker Compose setup for one-command deployment
 
-dotenv
+---
 
-📈 Future Improvements
+## 📄 License
 
-Potential enhancements:
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
 
-Web interface (Streamlit / React)
+---
 
-Repository architecture visualization
+## 👤 Author
 
-Code dependency graphs
+**Nithesh Kannan**
 
-Support for multiple LLM providers
+> Built as a portfolio project demonstrating skills in AI engineering, RAG systems, vector databases, LLM integration, and full-stack development.
 
-Persistent vector database
+[![GitHub](https://img.shields.io/badge/GitHub-@nitheshkannann-181717?style=flat&logo=github)](https://github.com/nitheshkannann)
 
-📸 Example Output
+---
 
-Example AI explanation generated by the system:
+<div align="center">
 
-The repository parser scans the repository directory,
-filters supported source files, and returns their contents
-for further processing by the chunking and embedding pipeline.
-🎯 Why This Project Matters
+*If this project helped you, consider giving it a ⭐ on GitHub!*
 
-This project demonstrates modern AI engineering techniques including:
-
-Retrieval-Augmented Generation (RAG)
-
-Vector databases
-
-Semantic search
-
-LLM integration
-
-AI-assisted developer tooling
-
-These concepts are used in tools like:
-
-Cursor AI
-
-GitHub Copilot Workspace
-
-Sourcegraph Cody
-
-👨‍💻 Author
-
-Built by Pandi Durai
-
-Mechanical Engineer → AI Developer
-
-⭐ Support
-
-If you find this project useful, consider giving it a star ⭐ on GitHub.
+</div>
