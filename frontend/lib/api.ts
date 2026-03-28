@@ -7,6 +7,13 @@ export interface LoadRepoResponse {
   vectors_indexed: number;
 }
 
+export interface GenerateRequirementsResponse {
+  python: string[];
+  javascript: string[];
+  source: string;
+  entry_points: Record<string, string>;
+}
+
 export interface ChunkResult {
   file_path: string;
   chunk_id: string;
@@ -60,4 +67,8 @@ export async function askQuestion(
   top_k: number
 ): Promise<AskResponse> {
   return apiFetch<AskResponse>("/ask", { question, top_k });
+}
+
+export async function generateRequirements(repo_path: string): Promise<GenerateRequirementsResponse> {
+  return apiFetch<GenerateRequirementsResponse>("/generate_requirements", { repo_path });
 }

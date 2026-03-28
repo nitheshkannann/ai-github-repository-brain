@@ -1,0 +1,8 @@
+faiss-cpu>=latest
+fastapi>=latest
+litellm>=latest
+numpy>=latest
+pydantic>=latest
+python-dotenv>=latest
+sentence-transformers>=latest
+tqdm>=latest
