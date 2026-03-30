@@ -11,16 +11,6 @@ CLI (backward compatibility):
     python src/app.py [--repo PATH] [--top-k N]
 """
 
-import socket
-import os
-
-port = int(os.environ.get("PORT", 10000))
-
-s = socket.socket()
-s.bind(("0.0.0.0", port))
-s.listen(1)
-print(f"[Render Fix] Port {port} opened early")
-
 import sys
 import argparse
 import logging
