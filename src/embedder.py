@@ -10,8 +10,9 @@ from sentence_transformers import SentenceTransformer
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# The model we use: lightweight, fast, and great for semantic search
-MODEL_NAME = "all-MiniLM-L6-v2"
+# Lightweight model for Render Free Tier (512MB RAM limit)
+# L3 (~100-150MB RAM) vs L6 (~400-500MB RAM)
+MODEL_NAME = "paraphrase-MiniLM-L3-v2"
 
 
 def load_model(model_name: str = MODEL_NAME) -> SentenceTransformer:
@@ -24,8 +25,8 @@ def load_model(model_name: str = MODEL_NAME) -> SentenceTransformer:
     Returns:
         SentenceTransformer: The loaded embedding model.
     """
-    logger.info(f"Loading embedding model: '{model_name}' ...")
-    model = SentenceTransformer(model_name)
+    logger.info(f"Loading embedding model: '{model_name}' (CPU mode) ...")
+    model = SentenceTransformer(model_name, device="cpu")  # Force CPU — avoids GPU overhead on Render
     logger.info("Model loaded successfully.")
     return model
 
@@ -33,7 +34,7 @@ def load_model(model_name: str = MODEL_NAME) -> SentenceTransformer:
 def generate_embeddings(
     chunks: List[Dict[str, str]],
     model: SentenceTransformer,
-    batch_size: int = 32
+    batch_size: int = 8  # Small batch to avoid RAM spikes on Render Free Tier
 ) -> List[Dict]:
     """
     Converts a list of text chunks into vector embeddings.

@@ -17,12 +17,10 @@ sys.path.append(str(Path(__file__).resolve().parent))
 
 import argparse
 import logging
-import numpy as np
 import os
 import subprocess
 from typing import List, Dict, Optional
 from dotenv import load_dotenv
-from contextlib import contextmanager
 
 load_dotenv()
 
@@ -34,8 +32,7 @@ from pydantic import BaseModel
 # ── Make sure sibling modules in src/ are importable ──────────────────────────
 from repo_parser import get_code_files           # type: ignore[import]
 from chunker import chunk_code_files             # type: ignore[import]
-# NOTE: embedder / retriever are imported LAZILY inside build_pipeline()
-# so that heavy ML libs (torch, faiss, sentence-transformers) never load at startup.
+# NOTE: No heavy ML imports — using lightweight keyword search instead of embeddings.
 import litellm
 
 # Only show WARNING+ from libraries so our own prints stay clean
@@ -54,8 +51,8 @@ app = FastAPI(
 
 @app.on_event("startup")
 async def startup_event():
-    """Lightweight startup — NO model loading, NO FAISS, NO torch."""
-    print("[Startup] ✅ App started successfully (lightweight mode — ML loads on first /load_repo call)")
+    """Lightweight startup — zero ML libs, just FastAPI + litellm."""
+    print("[Startup] ✅ App started (zero-ML mode — keyword search, no embeddings/FAISS)")
 
 # ── Add CORS Middleware ───────────────────────────────────────────────────────
 app.add_middleware(
@@ -130,17 +127,33 @@ class CompareReadmeResponse(BaseModel):
     generated_readme: str
     analysis: ReadmeAnalysis
 
-# ── Global State (pipeline cache) ─────────────────────────────────────────────
-_pipeline_cache: Dict[str, tuple] = {}
+# ── Global State: stores raw chunks per repo path ─────────────────────────────
+# { repo_path: List[Dict] }  — lightweight, no ML objects
+_pipeline_cache: Dict[str, List[Dict]] = {}
 
-@contextmanager
-def get_cached_pipeline(repo_path: str, top_k: int = 3):
-    """Cache pipelines to avoid rebuilding on every query."""
-    if repo_path not in _pipeline_cache:
-        model, retriever = build_pipeline(repo_path, top_k)
-        _pipeline_cache[repo_path] = (model, retriever)
-    model, retriever = _pipeline_cache[repo_path]
-    yield model, retriever
+
+# ── Lightweight keyword retrieval (replaces FAISS) ────────────────────────────
+
+def simple_search(chunks: List[Dict], query: str, top_k: int = 3) -> List[Dict]:
+    """
+    Keyword-frequency retrieval — zero RAM overhead, no ML dependencies.
+    Scores each chunk by how many times query words appear in its content.
+    """
+    query_words = query.lower().split()
+    scored = []
+    for chunk in chunks:
+        content_lower = chunk["content"].lower()
+        score = sum(content_lower.count(word) for word in query_words)
+        if score > 0:
+            scored.append((score, chunk))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+
+    # Fallback: if no keyword hits, return first top_k chunks
+    if not scored:
+        return chunks[:top_k]
+
+    return [chunk for _, chunk in scored[:top_k]]
 
 
 # ── Handle GitHub URLs ────────────────────────────────────────────────────────
@@ -266,18 +279,23 @@ def build_pipeline(repo_path: str, top_k: int = 3):
     if not files:
         print(f"❌  No supported code files found at: {repo_path}")
         sys.exit(1)
+
+    # ── Safety cap: prevent OOM on Render Free Tier (512MB) ──────────────────
+    files = files[:50]
+    print(f"[SAFE MODE] Files limited: {len(files)}")
     print(f"    ✓ {len(files)} files found")
 
     print("✂️   Chunking files ...")
     chunks = chunk_code_files(files)
     print(f"    ✓ {len(chunks)} chunks created")
 
-    print("🤖  Loading embedding model (all-MiniLM-L6-v2) ...")
+    print("🤖  Loading embedding model (paraphrase-MiniLM-L3-v2, CPU) ...")
     model = load_model()
     print("    ✓ Model ready")
 
-    print("⚡  Generating embeddings ...")
-    embedded = generate_embeddings(chunks, model, batch_size=64)
+    print("⚡  Generating embeddings (batch_size=8, safe mode) ...")
+    embedded = generate_embeddings(chunks, model, batch_size=8)
+    gc.collect()  # Free RAM immediately after embedding
     print(f"    ✓ {len(embedded)} embeddings  (dim={len(embedded[0]['embedding'])})")
 
     print("📦  Building FAISS index ...")
@@ -447,7 +465,10 @@ async def load_repo(request: LoadRepoRequest):
             print(f"[API] ✗ Error parsing files: {e}")
             raise HTTPException(status_code=400, detail=f"Cannot parse repository: {str(e)}")
         
+        files_count_total = len(files)
+        files = files[:50]  # Safety cap — prevent OOM on Render Free Tier (512MB)
         files_count = len(files)
+        print(f"[SAFE MODE] Files limited: {files_count} (of {files_count_total} found)")
         print(f"[API] ✓ {files_count} files found")
         
         # Chunk files
@@ -461,42 +482,21 @@ async def load_repo(request: LoadRepoRequest):
         
         chunks_count = len(chunks)
         print(f"[API] ✓ {chunks_count} chunks created")
-        
-        # Generate embeddings and build index
-        try:
-            # Lazy imports — heavy ML libs only loaded here, never at startup
-            from embedder import load_model, generate_embeddings  # type: ignore[import]
-            from retriever import FAISSRetriever                  # type: ignore[import]
 
-            print(f"[API] 🤖 Loading embedding model...")
-            model = load_model()
-            
-            print(f"[API] ⚡ Generating {chunks_count} embeddings...")
-            embedded = generate_embeddings(chunks, model, batch_size=64)
-            
-            print(f"[API] 📦 Building FAISS index...")
-            retriever = FAISSRetriever()
-            retriever.build_index(embedded)
-        except Exception as e:
-            print(f"[API] ✗ Error building index: {e}")
-            raise HTTPException(status_code=500, detail=f"Cannot build search index: {str(e)}")
-        
-        vectors_count = retriever.index.ntotal if retriever.index else 0  # type: ignore[union-attr]
-        print(f"[API] ✓ {vectors_count} vectors indexed")
-        
-        # Cache for later use
-        _pipeline_cache[repo_path] = (model, retriever)
-        
+        # ── Store chunks directly — no embeddings, no FAISS, zero RAM overhead ──
+        _pipeline_cache[repo_path] = chunks
+        print(f"[API] ✓ Chunks cached (keyword search mode)")
+
         message = (
-            f"Repository indexed successfully!\n"
-            f"Files: {files_count} | Chunks: {chunks_count} | Vectors: {vectors_count}"
+            f"Repository loaded successfully! (keyword search mode)\n"
+            f"Files: {files_count} | Chunks: {chunks_count}"
         )
-        
+
         return {
             "status": "success",
             "files_found": files_count,
             "chunks_created": chunks_count,
-            "vectors_indexed": vectors_count,
+            "vectors_indexed": chunks_count,  # repurposed field — chunk count
             "message": message
         }
     except HTTPException:
@@ -510,32 +510,25 @@ async def ask(request: AskRequest):
     """Ask a question about the loaded repository."""
     try:
         print(f"[API] POST /ask - Question: {request.question[:50]}...")
-        
-        # For now, we require a repo to be loaded first
-        # In production, this might default to a main repo or require repo_path in request
+
         if not _pipeline_cache:
             raise HTTPException(status_code=400, detail="No repository loaded. Use /load_repo first.")
-        
-        # Use the first cached pipeline (in a real app, you'd track which repo is active)
+
+        # Use the first cached repo's chunks
         repo_path = list(_pipeline_cache.keys())[0]
-        model, retriever = _pipeline_cache[repo_path]
-        
-        # Embed the question
-        query_vec: np.ndarray = model.encode(
-            [request.question], convert_to_numpy=True
-        )[0].astype("float32")
-        
-        # Retrieve chunks
-        results: List[Dict[str, str]] = retriever.retrieve(query_vec, top_k=request.top_k)
-        
+        chunks: List[Dict] = _pipeline_cache[repo_path]
+
+        # ── Keyword retrieval — zero RAM, no ML ───────────────────────────────
+        results: List[Dict] = simple_search(chunks, request.question, request.top_k)
+        print(f"[API] ✓ {len(results)} chunks retrieved via keyword search")
+
         if not results:
-            print(f"[API] No results found for question")
             return {
                 "explanation": "No relevant code sections found.",
                 "retrieved_chunks": []
             }
-        
-        # Build context
+
+        # Build context for LLM
         context_blocks = []
         for rank, chunk in enumerate(results, start=1):
             context_blocks.append(
@@ -544,22 +537,22 @@ async def ask(request: AskRequest):
                 f"Content:\n{chunk['content']}\n"
             )
         context_str = "\n".join(context_blocks)
-        
-        # Call LLM
+
+        # ── Call LLM (unchanged) ──────────────────────────────────────────────
         sys_prompt = "You are a helpful coding assistant. Using the following code context, explain the answer to the user's question."
         user_prompt = f"Context:\n{context_str}\n\nQuestion: {request.question}"
-        
+
         print(f"[API] 🤖 Calling LLM...")
         explanation = None
         last_error = None
-        
+
         models_to_try = [
             "gemini/gemini-2.5-flash",
             "gemini/gemini-2.5-pro",
             "gemini/gemini-2.0-flash",
             "gemini/gemini-1.5-flash",
         ]
-        
+
         for model_name in models_to_try:
             try:
                 response = litellm.completion(
@@ -576,26 +569,28 @@ async def ask(request: AskRequest):
                 last_error = e
                 print(f"[API] {model_name} failed: {e}")
                 continue
-        
+
         if not explanation:
             explanation = f"[LLM Error: {last_error}] Make sure GEMINI_API_KEY is set."
             print(f"[API] ✗ All LLM models failed")
-        
+
         # Format chunks for response
         chunk_results = [
             ChunkResult(
                 file_path=chunk["file_path"],
                 chunk_id=chunk["chunk_id"],
                 content=chunk["content"],
-                score=str(chunk.get("score", "N/A"))
+                score="keyword-match"
             )
             for chunk in results
         ]
-        
+
         return {
             "explanation": explanation,
             "retrieved_chunks": chunk_results
         }
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"[API] ✗ Error in /ask: {e}")
         raise HTTPException(status_code=500, detail=str(e))
