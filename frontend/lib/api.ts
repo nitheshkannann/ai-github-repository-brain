@@ -14,30 +14,24 @@
 // CONFIG
 // ==============================
 
-/** Get API base URL with multiple fallbacks */
-function getAPIBase(): string {
-  // Priority 1: Environment variable
-  if (typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_BASE) {
-    console.log("[API] Using env NEXT_PUBLIC_API_BASE:", process.env.NEXT_PUBLIC_API_BASE);
-    return process.env.NEXT_PUBLIC_API_BASE;
-  }
+/** Render backend — always the source of truth.
+ *  Override with NEXT_PUBLIC_API_BASE for local dev. */
+const RENDER_BACKEND = "https://ai-github-repository-brain.onrender.com";
 
-  // Priority 2: 127.0.0.1 (most reliable in dev)
-  const fallback = "http://127.0.0.1:8000";
-  console.log("[API] No env var; using fallback:", fallback);
-  return fallback;
+function getAPIBase(): string {
+  if (typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_BASE) {
+    return process.env.NEXT_PUBLIC_API_BASE.replace(/\/$/, ""); // strip trailing slash
+  }
+  return RENDER_BACKEND;
 }
 
 const API_BASE = getAPIBase();
-const API_TIMEOUT = 30000; // 30 seconds for regular calls
-const HEALTH_CHECK_TIMEOUT = 60000; // 60 seconds for health checks (longer to avoid false negatives)
-const MAX_RETRIES = 2; // Retry failed requests
+const ALT_API_BASE = API_BASE; // No local fallback — keep same base
+const API_TIMEOUT = 90000;      // 90 s — Render free tier can be slow
+const HEALTH_CHECK_TIMEOUT = 15000; // 15 s health check
+const MAX_RETRIES = 1;
 
-console.log(`[API] Final Base URL: ${API_BASE}`);
-
-// Alternative base for fallback attempts
-const ALT_API_BASE = API_BASE.includes("127.0.0.1") ? "http://localhost:8000" : "http://127.0.0.1:8000";
-console.log(`[API] Alternative Base URL (fallback): ${ALT_API_BASE}`);
+console.log(`[API] Base URL: ${API_BASE}`);
 
 // ==============================
 // TYPES
@@ -170,13 +164,9 @@ async function apiFetch<T>(
         });
       } catch (err: any) {
         if (err.name === "AbortError") {
-          throw new Error(`Request timeout (${timeoutMs}ms). Backend is slow or unreachable.`);
+          throw new Error(`Request timeout (${timeoutMs / 1000}s). The Render free tier may be waking up — wait 30s and retry.`);
         }
-
-        throw new Error(
-          `Cannot reach backend at ${base}\n` +
-            `Backend must run: uvicorn src.api:app --reload --port 8000`
-        );
+        throw new Error(`Cannot reach backend at ${base}. Check Render deployment status.`);
       }
 
       if (!response.ok) {
@@ -198,13 +188,8 @@ async function apiFetch<T>(
     }, MAX_RETRIES);
   }
 
-  // Try primary base first, then fallback
-  try {
-    return await tryFetch(API_BASE);
-  } catch (err: any) {
-    console.warn(`[API] Primary base failed for ${path}; trying alternative: ${ALT_API_BASE}`);
-    return tryFetch(ALT_API_BASE);
-  }
+  // Only try one base — it's always Render in production
+  return tryFetch(API_BASE);
 }
 
 // ==============================
@@ -288,19 +273,8 @@ export async function checkBackendHealth(): Promise<boolean> {
     }
   }
 
-  // Try primary base first, then fallback, with up to 3 total attempts
-  const attempts = [API_BASE, ALT_API_BASE, API_BASE];
-  for (let i = 0; i < attempts.length; i++) {
-    const base = attempts[i];
-    if (await tryHealth(base)) return true;
-    if (i < attempts.length - 1) {
-      console.log(`[API] Retrying health check (attempt ${i + 2}/${attempts.length})...`);
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // 1s delay between retries
-    }
-  }
-
-  console.log("[API] Health check failed; backend likely down or unreachable.");
-  return false;
+  // Single base — Render URL
+  return tryHealth(API_BASE);
 }
 
 /** Wait for backend to be ready with retries */

@@ -37,7 +37,7 @@ function ParticleCanvas() {
     const N = 60;
 
     function resize() {
-      canvas!.width  = window.innerWidth;
+      canvas!.width = window.innerWidth;
       canvas!.height = window.innerHeight;
     }
     resize();
@@ -123,35 +123,35 @@ function ParticleCanvas() {
 
 /* ─── Main Page ────────────────────────────────────────────────────────────── */
 export default function Home() {
-  const [repoPath, setRepoPath]           = useState("");
-  const [topK, setTopK]                   = useState(3);
-  const [repoLoaded, setRepoLoaded]       = useState(false);
-  const [sidebarOpen, setSidebarOpen]     = useState(true);
+  const [repoPath, setRepoPath] = useState("");
+  const [topK, setTopK] = useState(3);
+  const [repoLoaded, setRepoLoaded] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isBackendActive, setIsBackendActive] = useState(true);
-  const [mounted, setMounted]             = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   // Lifted sidebar state
-  const [loadLoading, setLoadLoading]     = useState(false);
-  const [loadResult, setLoadResult]       = useState<LoadRepoResponse | null>(null);
-  const [loadError, setLoadError]         = useState<string | null>(null);
-  const [showStats, setShowStats]         = useState(false);
+  const [loadLoading, setLoadLoading] = useState(false);
+  const [loadResult, setLoadResult] = useState<LoadRepoResponse | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [showStats, setShowStats] = useState(false);
 
-  const [reqLoading, setReqLoading]       = useState(false);
-  const [reqResult, setReqResult]         = useState<GenerateRequirementsResponse | null>(null);
-  const [reqError, setReqError]           = useState<string | null>(null);
-  const [showSetup, setShowSetup]         = useState(false);
+  const [reqLoading, setReqLoading] = useState(false);
+  const [reqResult, setReqResult] = useState<GenerateRequirementsResponse | null>(null);
+  const [reqError, setReqError] = useState<string | null>(null);
+  const [showSetup, setShowSetup] = useState(false);
 
   const [readmeLoading, setReadmeLoading] = useState(false);
-  const [readmeResult, setReadmeResult]   = useState<string | null>(null);
-  const [readmeError, setReadmeError]     = useState<string | null>(null);
+  const [readmeResult, setReadmeResult] = useState<string | null>(null);
+  const [readmeError, setReadmeError] = useState<string | null>(null);
   const [showReadmeModal, setShowReadmeModal] = useState(false);
 
-  const [compareLoading, setCompareLoading]   = useState(false);
-  const [compareResult, setCompareResult]     = useState<CompareReadmeResponse | null>(null);
-  const [compareError, setCompareError]       = useState<string | null>(null);
+  const [compareLoading, setCompareLoading] = useState(false);
+  const [compareResult, setCompareResult] = useState<CompareReadmeResponse | null>(null);
+  const [compareError, setCompareError] = useState<string | null>(null);
   const [showCompareModal, setShowCompareModal] = useState(false);
 
-  const [actionStatus, setActionStatus]   = useState<string | null>(null);
+  const [actionStatus, setActionStatus] = useState<string | null>(null);
   const statusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Mount animation
@@ -187,7 +187,7 @@ export default function Home() {
     const loadingToastId = toast.loading("Indexing repository...");
     displayStatus("⚡ Indexing repository...");
     try {
-      const fetchPromise   = loadRepo(repoPath.trim());
+      const fetchPromise = loadRepo(repoPath.trim());
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error("Request timeout after 20 seconds")), 20000)
       );
@@ -283,9 +283,8 @@ export default function Home() {
       >
         {/* ──────────────────── SIDEBAR ──────────────────── */}
         <aside
-          className={`sidebar-3d shrink-0 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] overflow-hidden ${
-            sidebarOpen ? "w-80" : "w-0"
-          } ${mounted ? "animate-slide-left" : ""}`}
+          className={`sidebar-3d shrink-0 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] overflow-hidden ${sidebarOpen ? "w-80" : "w-0"
+            } ${mounted ? "animate-slide-left" : ""}`}
           style={{ position: "relative" }}
         >
           {/* Glowing top accent */}
@@ -322,9 +321,8 @@ export default function Home() {
         <main className="flex-1 flex flex-col min-w-0">
           {/* ── Header ── */}
           <header
-            className={`header-3d h-16 shrink-0 flex items-center px-5 gap-4 relative ${
-              mounted ? "animate-slide-down" : ""
-            }`}
+            className={`header-3d h-16 shrink-0 flex items-center px-5 gap-4 relative ${mounted ? "animate-slide-down" : ""
+              }`}
           >
             {/* Glowing bottom accent */}
             <div
@@ -432,9 +430,8 @@ export default function Home() {
 
           {/* ── Chat area ── */}
           <div
-            className={`flex-1 flex flex-col min-w-0 chat-bg ${
-              mounted ? "animate-fade-up delay-200" : ""
-            }`}
+            className={`flex-1 flex flex-col min-w-0 chat-bg ${mounted ? "animate-fade-up delay-200" : ""
+              }`}
           >
             <Chat
               topK={topK}
