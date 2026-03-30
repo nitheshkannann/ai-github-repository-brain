@@ -7,25 +7,28 @@ from typing import List, Dict
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-SUPPORTED_EXTENSIONS = {'.py', '.js', '.cpp', '.ts', '.java'}
+SUPPORTED_EXTENSIONS = {
+    '.py', '.js', '.ts', '.tsx', '.jsx', '.java', '.go', '.cpp', '.c', '.cs',
+    '.json', '.md', '.yaml', '.yml', '.toml'
+}
 
 # Standard directories to ignore when scanning
 IGNORED_DIRS = {
-    ".git",
-    ".venv",
-    "venv",
-    "__pycache__",
     "node_modules",
-    "dist",
-    "build",
-    "site-packages",
-    ".mypy_cache",
-    ".pytest_cache",
-    ".idea",
-    ".vscode"
+    ".git",
+    "__pycache__",
+    ".next",
+    "venv",
 }
 
-def get_code_files(repo_path: str) -> List[Dict[str, str]]:
+MAX_SELECTED_FILES = 200
+MAX_FILE_SIZE_BYTES = 1_000_000
+
+def get_code_files(
+    repo_path: str,
+    max_selected_files: int = MAX_SELECTED_FILES,
+    include_content: bool = True,
+) -> List[Dict[str, str]]:
     """
     Scans a local repository directory and returns the content of all supported code files.
     
@@ -43,8 +46,12 @@ def get_code_files(repo_path: str) -> List[Dict[str, str]]:
         logger.error(f"The repository path does not exist or is not a directory: {repo_path}")
         raise ValueError(f"Invalid repository path: {repo_path}")
         
-    code_files = []
+    if max_selected_files <= 0:
+        max_selected_files = 0
+
+    code_files: List[Dict[str, str]] = []
     ignored_dir_count = 0
+    total_files_found = 0
     
     logger.info(f"Scanning repository at '{repo_path}' for files with extensions: {', '.join(SUPPORTED_EXTENSIONS)}")
     
@@ -54,7 +61,7 @@ def get_code_files(repo_path: str) -> List[Dict[str, str]]:
         # Using clear() + extend() instead of slice assignment to keep type checkers happy
         filtered = []
         for d in dirs:
-            if d in IGNORED_DIRS or d.startswith('.'):
+            if d in IGNORED_DIRS:
                 ignored_dir_count += 1
             else:
                 filtered.append(d)
@@ -66,15 +73,25 @@ def get_code_files(repo_path: str) -> List[Dict[str, str]]:
             # Skip hidden files
             if file.startswith('.'):
                 continue
+
+            total_files_found += 1
                 
             file_path = Path(root) / file
             
             # Check if the file has a supported extension
             if file_path.suffix.lower() in SUPPORTED_EXTENSIONS:
                 try:
-                    # Read the file content
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        content = f.read()
+                    try:
+                        if file_path.stat().st_size > MAX_FILE_SIZE_BYTES:
+                            continue
+                    except Exception:
+                        continue
+
+                    content = ""
+                    if include_content:
+                        # Read the file content
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            content = f.read()
                         
                     # Calculate path relative to the repository root for clean output
                     relative_path = file_path.relative_to(repo_path_obj)
@@ -84,11 +101,21 @@ def get_code_files(repo_path: str) -> List[Dict[str, str]]:
                         'path': str(relative_path).replace('\\', '/'),
                         'content': content
                     })
+
+                    if max_selected_files and len(code_files) >= max_selected_files:
+                        print("Total files found:", total_files_found)
+                        print("Code files selected:", len(code_files))
+                        logger.info(
+                            f"Reached max_selected_files={max_selected_files}. Stopping scan early."
+                        )
+                        return code_files
                 except UnicodeDecodeError:
                     logger.warning(f"Skipping file {file_path} due to encoding issues (not valid UTF-8).")
                 except Exception as e:
                     logger.warning(f"Could not read file {file_path}: {e}")
                     
+    print("Total files found:", total_files_found)
+    print("Code files selected:", len(code_files))
     logger.info(f"Successfully loaded {len(code_files)} code files. Ignored {ignored_dir_count} directories.")
     return code_files
 

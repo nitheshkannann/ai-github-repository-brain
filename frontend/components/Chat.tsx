@@ -5,6 +5,7 @@ import { askQuestion, AskResponse, ChunkResult } from "@/lib/api";
 import CodeBlock from "./CodeBlock";
 import ReactMarkdown from "react-markdown";
 import { Send, Bot, User, Sparkles, Layers } from "lucide-react";
+import FloatingActionMenu from "./FloatingActionMenu";
 
 interface Message {
     role: "user" | "assistant";
@@ -16,6 +17,13 @@ interface Message {
 interface ChatProps {
     topK: number;
     repoLoaded: boolean;
+    isBackendActive: boolean;
+    onLoadRepository: () => void;
+    onGenerateRequirements: () => void;
+    onSetupGuide: () => void;
+    onGenerateReadme: () => void;
+    onCompareReadme: () => void;
+    actionStatus: string | null;
 }
 
 const WELCOME = `Welcome! I'm your **AI Codebase Assistant**.
@@ -26,7 +34,17 @@ Load a repository using the sidebar, then ask me anything about the code — lik
 - *"What does the embedder module do?"*
 - *"Explain the retrieval pipeline."*`;
 
-export default function Chat({ topK, repoLoaded }: ChatProps) {
+export default function Chat({ 
+    topK, 
+    repoLoaded, 
+    isBackendActive,
+    onLoadRepository,
+    onGenerateRequirements,
+    onSetupGuide,
+    onGenerateReadme,
+    onCompareReadme,
+    actionStatus
+}: ChatProps) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(false);
@@ -83,6 +101,16 @@ export default function Chat({ topK, repoLoaded }: ChatProps) {
         if (el) {
             el.style.height = "auto";
             el.style.height = Math.min(el.scrollHeight, 160) + "px";
+        }
+    }
+
+    function handleActionMenu(action: "load" | "dependencies" | "setup" | "readme" | "compare") {
+        switch(action) {
+            case "load": onLoadRepository(); break;
+            case "dependencies": onGenerateRequirements(); break;
+            case "setup": onSetupGuide(); break;
+            case "readme": onGenerateReadme(); break;
+            case "compare": onCompareReadme(); break;
         }
     }
 
@@ -201,9 +229,15 @@ export default function Chat({ topK, repoLoaded }: ChatProps) {
 
             {/* Input bar */}
             <div className="p-4 border-t border-white/6 bg-slate-950/60 backdrop-blur-sm">
-                <div className="max-w-3xl mx-auto flex gap-3 items-end">
-                    <div className="flex-1 relative">
-                        <textarea
+                <div className="max-w-3xl mx-auto flex flex-col gap-2 w-full">
+                    {actionStatus && (
+                        <div className="text-blue-400 text-xs px-2 animate-pulse font-medium flex items-center gap-2">
+                            {actionStatus}
+                        </div>
+                    )}
+                    <div className="flex gap-3 items-end w-full">
+                        <div className="flex-1 relative">
+                            <textarea
                             ref={textareaRef}
                             value={input}
                             onChange={handleInput}
@@ -215,7 +249,11 @@ export default function Chat({ topK, repoLoaded }: ChatProps) {
                             }
                             disabled={!repoLoaded || loading}
                             rows={1}
-                            className="w-full bg-slate-800/80 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 placeholder-slate-600 resize-none focus:outline-none focus:ring-1 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all disabled:opacity-40 disabled:cursor-not-allowed leading-relaxed"
+                            className="w-full bg-slate-800/80 border border-white/10 rounded-xl pl-4 pr-14 py-3 text-sm text-slate-200 placeholder-slate-600 resize-none focus:outline-none focus:ring-1 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all disabled:opacity-40 disabled:cursor-not-allowed leading-relaxed"
+                        />
+                        <FloatingActionMenu 
+                            onAction={handleActionMenu} 
+                            disabled={!repoLoaded || !isBackendActive} 
                         />
                     </div>
                     <button
@@ -225,6 +263,7 @@ export default function Chat({ topK, repoLoaded }: ChatProps) {
                     >
                         <Send size={16} />
                     </button>
+                    </div>
                 </div>
                 <p className="text-center text-xs text-slate-700 mt-2">
                     Press <kbd className="text-slate-600 font-mono">Enter</kbd> to send ·{" "}

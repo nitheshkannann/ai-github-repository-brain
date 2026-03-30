@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = "http://localhost:8000";
 
 export interface LoadRepoResponse {
   status: string;
@@ -71,4 +71,40 @@ export async function askQuestion(
 
 export async function generateRequirements(repo_path: string): Promise<GenerateRequirementsResponse> {
   return apiFetch<GenerateRequirementsResponse>("/generate_requirements", { repo_path });
+}
+
+export interface GenerateReadmeResponse {
+  readme_content: string;
+}
+
+export async function generateReadme(repo_path: string): Promise<GenerateReadmeResponse> {
+  return apiFetch<GenerateReadmeResponse>("/generate_readme", { repo_path });
+}
+
+export interface ReadmeAnalysis {
+  missing_sections: string[];
+  improvements: string[];
+  score_existing: number;
+  score_generated: number;
+}
+
+export interface CompareReadmeResponse {
+  existing_readme: string;
+  generated_readme: string;
+  analysis: ReadmeAnalysis;
+}
+
+export async function compareReadme(repo_path: string): Promise<CompareReadmeResponse> {
+  return apiFetch<CompareReadmeResponse>("/compare_readme", { repo_path });
+}
+
+export async function checkBackendHealth(): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/`, { method: "GET" });
+    if (!res.ok) return false;
+    const body = await res.json();
+    return body.status === "ok";
+  } catch {
+    return false;
+  }
 }

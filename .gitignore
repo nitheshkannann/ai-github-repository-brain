@@ -12,3 +12,4 @@ Thumbs.db
 
 # Environment variables
 .env
+data/repos/

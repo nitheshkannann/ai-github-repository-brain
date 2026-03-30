@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { loadRepo, LoadRepoResponse, generateRequirements, GenerateRequirementsResponse } from "@/lib/api";
+import { useState, useEffect } from "react";
+import { loadRepo, LoadRepoResponse, generateRequirements, GenerateRequirementsResponse, generateReadme, GenerateReadmeResponse, compareReadme, CompareReadmeResponse, checkBackendHealth } from "@/lib/api";
 import {
     FolderOpen,
     RefreshCw,
@@ -13,15 +13,41 @@ import {
     Box,
     Download,
     Terminal,
-    Copy
+    Copy,
+    FileText,
+    X
 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 
 interface SidebarProps {
     repoPath: string;
     topK: number;
     onRepoPathChange: (v: string) => void;
     onTopKChange: (v: number) => void;
-    onRepoLoaded: (info: LoadRepoResponse) => void;
+    isBackendActive: boolean;
+
+    handleLoad: () => void;
+    loadLoading: boolean;
+    loadResult: LoadRepoResponse | null;
+    loadError: string | null;
+    showStats: boolean;
+    setShowStats: (v: boolean) => void;
+
+    reqLoading: boolean;
+    reqResult: GenerateRequirementsResponse | null;
+    reqError: string | null;
+    showSetup: boolean;
+    setShowSetup: (v: boolean) => void;
+
+    readmeError: string | null;
+    showReadmeModal: boolean;
+    setShowReadmeModal: (v: boolean) => void;
+    readmeResult: string | null;
+
+    compareError: string | null;
+    showCompareModal: boolean;
+    setShowCompareModal: (v: boolean) => void;
+    compareResult: CompareReadmeResponse | null;
 }
 
 export default function Sidebar({
@@ -29,49 +55,31 @@ export default function Sidebar({
     topK,
     onRepoPathChange,
     onTopKChange,
-    onRepoLoaded,
+    isBackendActive,
+    
+    handleLoad,
+    loadLoading: loading,
+    loadResult: result,
+    loadError: error,
+    showStats,
+    setShowStats,
+
+    reqLoading,
+    reqResult,
+    reqError,
+    showSetup,
+    setShowSetup,
+
+    readmeError,
+    showReadmeModal,
+    setShowReadmeModal,
+    readmeResult,
+
+    compareError,
+    showCompareModal,
+    setShowCompareModal,
+    compareResult
 }: SidebarProps) {
-    const [loading, setLoading] = useState(false);
-    const [result, setResult] = useState<LoadRepoResponse | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [showStats, setShowStats] = useState(false);
-
-    const [reqLoading, setReqLoading] = useState(false);
-    const [reqResult, setReqResult] = useState<GenerateRequirementsResponse | null>(null);
-    const [reqError, setReqError] = useState<string | null>(null);
-    const [showSetup, setShowSetup] = useState(false);
-
-    async function handleLoad() {
-        if (!repoPath.trim()) return;
-        setLoading(true);
-        setError(null);
-        setResult(null);
-        try {
-            const data = await loadRepo(repoPath.trim());
-            setResult(data);
-            onRepoLoaded(data);
-        } catch (e: unknown) {
-            setError(e instanceof Error ? e.message : "Unknown error");
-        } finally {
-            setLoading(false);
-        }
-    }
-
-    async function handleGenerateRequirements() {
-        if (!repoPath.trim()) return;
-        setReqLoading(true);
-        setReqError(null);
-        setReqResult(null);
-        try {
-            const data = await generateRequirements(repoPath.trim());
-            setReqResult(data);
-        } catch (e: unknown) {
-            setReqError(e instanceof Error ? e.message : "Unknown error");
-        } finally {
-            setReqLoading(false);
-        }
-    }
-
     function handleDownloadReqs() {
         if (!reqResult) return;
         
@@ -131,22 +139,63 @@ export default function Sidebar({
         }
     }
 
+    function handleCopyReadme() {
+        if (readmeResult) {
+            navigator.clipboard.writeText(readmeResult);
+        }
+    }
+
+    function handleDownloadReadme() {
+        if (!readmeResult) return;
+        const blob = new Blob([readmeResult], { type: "text/markdown" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "README.md";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    function handleDownloadCompareReadme() {
+        if (!compareResult) return;
+        const blob = new Blob([compareResult.generated_readme], { type: "text/markdown" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "README_improved.md";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
     return (
         <aside className="flex flex-col gap-6 w-full h-full p-6">
             {/* Header */}
-            <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-md bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center">
-                    <span className="text-emerald-400 text-sm">🧠</span>
-                </div>
-                <div>
-                    <h1 className="text-sm font-semibold text-white leading-none">
-                        Repo Brain
-                    </h1>
-                    <p className="text-xs text-slate-500 mt-0.5">AI Code Explorer</p>
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-md bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center">
+                        <span className="text-emerald-400 text-sm">🧠</span>
+                    </div>
+                    <div>
+                        <h1 className="text-sm font-semibold text-white leading-none">
+                            Repo Brain
+                        </h1>
+                        <p className="text-xs text-slate-500 mt-0.5">AI Code Explorer</p>
+                    </div>
                 </div>
             </div>
 
-            <div className="h-px bg-white/5" />
+            {!isBackendActive && (
+                <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-lg p-2.5">
+                    <AlertCircle size={14} className="text-red-400 shrink-0" />
+                    <span className="text-xs font-semibold text-red-400">Backend not running</span>
+                </div>
+            )}
+
+            <div className="h-px bg-white/5 shrink-0" />
 
             {/* Repository Path */}
             <div className="flex flex-col gap-2">
@@ -192,7 +241,7 @@ export default function Sidebar({
             {/* Load Button */}
             <button
                 onClick={handleLoad}
-                disabled={loading || !repoPath.trim()}
+                disabled={!isBackendActive || loading || !repoPath.trim()}
                 className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-700 disabled:text-slate-500 text-black disabled:cursor-not-allowed font-semibold text-sm py-2.5 px-4 rounded-lg transition-all duration-200 shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 active:scale-95"
             >
                 {loading ? (
@@ -208,25 +257,21 @@ export default function Sidebar({
                 )}
             </button>
 
-            {/* Generate Button Group */}
-            <div className="flex gap-2 w-full mt-[-10px]">
-                <button
-                    onClick={() => { setShowSetup(false); handleGenerateRequirements(); }}
-                    disabled={reqLoading || !repoPath.trim()}
-                    className="flex-1 flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-700 disabled:bg-slate-800/50 border border-slate-700 text-slate-200 text-xs py-2 rounded-lg transition-colors active:scale-95"
-                >
-                    {reqLoading && !showSetup ? <RefreshCw size={12} className="animate-spin" /> : <Box size={12} />}
-                    Dependencies
-                </button>
-                <button
-                    onClick={() => { setShowSetup(true); handleGenerateRequirements(); }}
-                    disabled={reqLoading || !repoPath.trim()}
-                    className="flex-1 flex items-center justify-center gap-1.5 bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/30 text-indigo-300 text-xs py-2 rounded-lg transition-colors active:scale-95"
-                >
-                    {reqLoading && showSetup ? <RefreshCw size={12} className="animate-spin" /> : <Terminal size={12} />}
-                    Setup Guide
-                </button>
-            </div>
+            {/* Readme Error */}
+            {readmeError && (
+                <div className="flex items-start gap-2 bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+                    <AlertCircle size={14} className="text-red-400 mt-0.5 shrink-0" />
+                    <p className="text-xs text-red-300">{readmeError}</p>
+                </div>
+            )}
+
+            {/* Compare Error */}
+            {compareError && (
+                <div className="flex items-start gap-2 bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+                    <AlertCircle size={14} className="text-red-400 mt-0.5 shrink-0" />
+                    <p className="text-xs text-red-300">{compareError}</p>
+                </div>
+            )}
 
             {/* Status */}
             {error && (
@@ -364,6 +409,167 @@ export default function Sidebar({
             <div className="mt-auto text-xs text-slate-700 text-center">
                 Powered by Gemini · FAISS
             </div>
+
+            {/* README Modal */}
+            {showReadmeModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 sm:p-6 text-white text-left">
+                    <div className="bg-slate-900 border border-white/10 rounded-xl shadow-2xl w-full max-w-4xl max-h-full flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                        {/* Header */}
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 shrink-0 bg-slate-950/50">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-lg">
+                                    <FileText size={18} />
+                                </div>
+                                <h2 className="text-lg font-semibold text-slate-100 placeholder-slate-600">Generated README.md</h2>
+                            </div>
+                            <button
+                                onClick={() => setShowReadmeModal(false)}
+                                className="text-slate-400 hover:text-white transition-colors bg-white/5 hover:bg-white/10 p-2 rounded-lg"
+                                aria-label="Close modal"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        {/* Content Area */}
+                        <div className="flex-1 overflow-y-auto p-6 bg-[#0d1117] prose prose-invert prose-emerald max-w-none text-sm leading-relaxed custom-scrollbar">
+                            {readmeResult ? (
+                                <ReactMarkdown>
+                                    {readmeResult}
+                                </ReactMarkdown>
+                            ) : (
+                                <div className="text-center text-slate-500 mt-10">No content generated.</div>
+                            )}
+                        </div>
+
+                        {/* Footer / Actions */}
+                        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-white/10 shrink-0 bg-slate-950/50">
+                            <button
+                                onClick={handleCopyReadme}
+                                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+                            >
+                                <Copy size={16} />
+                                Copy Markdown
+                            </button>
+                            <button
+                                onClick={handleDownloadReadme}
+                                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white transition-colors shadow-lg shadow-blue-500/20"
+                            >
+                                <Download size={16} />
+                                Download README.md
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Compare Readme Modal */}
+            {showCompareModal && compareResult && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 sm:p-6 text-white text-left">
+                    <div className="bg-slate-900 border border-white/10 rounded-xl shadow-2xl w-full max-w-7xl h-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                        {/* Header */}
+                        <div className="flex flex-col border-b border-white/10 shrink-0 bg-slate-950/50">
+                            <div className="flex items-center justify-between px-6 py-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded-lg">
+                                        <FileText size={18} />
+                                    </div>
+                                    <h2 className="text-lg font-semibold text-slate-100 placeholder-slate-600">README Comparison</h2>
+                                </div>
+                                <button
+                                    onClick={() => setShowCompareModal(false)}
+                                    className="text-slate-400 hover:text-white transition-colors bg-white/5 hover:bg-white/10 p-2 rounded-lg"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+                            
+                            {/* Scoreboard Bar */}
+                            <div className="flex items-center justify-between px-6 py-3 bg-slate-900 border-t border-white/5">
+                                <div className="flex gap-8 items-center">
+                                    <div className="flex flex-col">
+                                        <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Existing Score</span>
+                                        <span className={`text-xl font-bold ${compareResult.analysis.score_existing < 5 ? "text-red-400" : "text-amber-400"}`}>
+                                            {compareResult.analysis.score_existing}/10
+                                        </span>
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Generated Score</span>
+                                        <span className={`text-xl font-bold ${compareResult.analysis.score_generated > compareResult.analysis.score_existing ? "text-emerald-400" : "text-blue-400"}`}>
+                                            {compareResult.analysis.score_generated}/10
+                                        </span>
+                                    </div>
+                                    {compareResult.analysis.score_generated > compareResult.analysis.score_existing && (
+                                        <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-1.5 ml-2">
+                                            <span className="text-emerald-500">↑</span>
+                                            Improved by +{compareResult.analysis.score_generated - compareResult.analysis.score_existing} points
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="text-right">
+                                    <span className="text-sm font-medium text-slate-300 italic">
+                                        {compareResult.analysis.score_generated > compareResult.analysis.score_existing + 2 ? "Generated README is significantly better" : 
+                                         compareResult.analysis.score_generated > compareResult.analysis.score_existing ? "Generated README is improved" : "Both versions are similar in quality"}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Content Area - Side by Side */}
+                        <div className="flex flex-1 overflow-hidden">
+                            <div className="w-1/2 flex flex-col border-r border-white/10">
+                                <div className="bg-slate-800/50 py-2 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wide border-b border-white/5 shrink-0">
+                                    Existing README.md
+                                </div>
+                                <div className="flex-1 overflow-y-auto p-6 bg-[#0d1117] prose prose-invert prose-emerald max-w-none text-sm leading-relaxed custom-scrollbar">
+                                    <ReactMarkdown>{compareResult.existing_readme}</ReactMarkdown>
+                                </div>
+                            </div>
+                            <div className="w-1/2 flex flex-col">
+                                <div className="bg-slate-800/50 py-2 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wide border-b border-white/5 shrink-0">
+                                    Generated README.md
+                                </div>
+                                <div className="flex-1 overflow-y-auto p-6 bg-[#0d1117] prose prose-invert prose-emerald max-w-none text-sm leading-relaxed custom-scrollbar">
+                                    <ReactMarkdown>{compareResult.generated_readme}</ReactMarkdown>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {/* Insights & Actions */}
+                        <div className="flex flex-col border-t border-white/10 shrink-0 bg-slate-950/50 p-4">
+                            <div className="flex gap-6 mb-4">
+                                <div className="flex-1">
+                                    <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 flex items-center gap-1.5"><AlertCircle size={14} className="text-amber-400"/> Missing Sections Detected</h4>
+                                    <ul className="text-sm text-slate-300 space-y-1">
+                                        {compareResult.analysis.missing_sections.length > 0 ? 
+                                            compareResult.analysis.missing_sections.map((m: string, i: number) => <li key={i} className="flex items-start gap-2 before:content-['•'] before:text-slate-500">{m}</li>) :
+                                            <li className="text-emerald-400/80 italic">No missing sections found!</li>
+                                        }
+                                    </ul>
+                                </div>
+                                <div className="flex-1">
+                                    <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 flex items-center gap-1.5"><CheckCircle2 size={14} className="text-emerald-400"/> Key Improvements</h4>
+                                    <ul className="text-sm text-slate-300 space-y-1">
+                                        {compareResult.analysis.improvements.length > 0 ? 
+                                            compareResult.analysis.improvements.map((m: string, i: number) => <li key={i} className="flex items-start gap-2 before:content-['•'] before:text-slate-500">{m}</li>) :
+                                            <li className="text-slate-500 italic">No major improvements noted.</li>
+                                        }
+                                    </ul>
+                                </div>
+                            </div>
+                            <div className="flex justify-end pt-3 border-t border-white/5">
+                                <button
+                                    onClick={handleDownloadCompareReadme}
+                                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-colors shadow-lg shadow-emerald-500/20"
+                                >
+                                    <Download size={16} />
+                                    Download Improved README 🚀
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </aside>
     );
 }
