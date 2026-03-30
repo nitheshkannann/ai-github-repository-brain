@@ -12,15 +12,19 @@ CLI (backward compatibility):
 """
 
 import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parent))
+
 import argparse
 import logging
 import numpy as np
 import os
 import subprocess
-from pathlib import Path
 from typing import List, Dict, Optional
 from dotenv import load_dotenv
 from contextlib import contextmanager
+
+load_dotenv()
 
 # ── FastAPI ───────────────────────────────────────────────────────────────────
 from fastapi import FastAPI, HTTPException
@@ -28,10 +32,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 # ── Make sure sibling modules in src/ are importable ──────────────────────────
-src_dir = str(Path(__file__).resolve().parent)
-if src_dir not in sys.path:
-    sys.path.insert(0, src_dir)
-
 from repo_parser import get_code_files           # type: ignore[import]
 from chunker import chunk_code_files             # type: ignore[import]
 from embedder import load_model, generate_embeddings  # type: ignore[import]
@@ -682,8 +682,7 @@ def main_cli() -> None:
 
     load_dotenv()
     if not os.environ.get("GEMINI_API_KEY"):
-        print("❌ Gemini API key not found. Please add GEMINI_API_KEY to your .env file.")
-        sys.exit(1)
+        print("WARNING: GEMINI_API_KEY not set. LLM features may not work.")
     print("✓ Gemini API key loaded successfully")
 
     # ── Banner ────────────────────────────────────────────────────────────────
@@ -719,22 +718,9 @@ def main_cli() -> None:
         answer_query(query, model, retriever, top_k)
 
 
+import os
+import uvicorn
+
 if __name__ == "__main__":
-    # Check if running as web server or CLI
-    # If called with --repo or other CLI args, run CLI mode
-    # Otherwise, uvicorn will handle the web server
-    if len(sys.argv) > 1:
-        main_cli()
-    else:
-        # This is for direct python execution
-        # In production, use: uvicorn src.app:app --reload --port 8000
-        import uvicorn
-        print("\n" + "=" * 60)
-        print("   🚀 Starting AI GitHub Repository Brain Server")
-        print("=" * 60)
-        print("   Server: http://localhost:8000")
-        print("   Docs:   http://localhost:8000/docs")
-        print("=" * 60 + "\n")
-        
-        port = int(os.environ.get("PORT", 10000))
-        uvicorn.run("src.app:app", host="0.0.0.0", port=port)
+    port = int(os.environ.get("PORT", 10000))
+    uvicorn.run("src.app:app", host="0.0.0.0", port=port)
