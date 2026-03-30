@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { askQuestion, AskResponse, ChunkResult } from "@/lib/api";
+import { askQuestion, AskResponse, ChunkResult, fetchReadme } from "@/lib/api";
 import CodeBlock from "./CodeBlock";
 import ReactMarkdown from "react-markdown";
-import { Send, Bot, User, Sparkles, Layers } from "lucide-react";
+import { Send, Bot, User, Sparkles, Layers, Copy } from "lucide-react";
 import FloatingActionMenu from "./FloatingActionMenu";
 
 interface Message {
@@ -48,12 +48,31 @@ export default function Chat({
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(false);
+    const [readme, setReadme] = useState("");
     const bottomRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages, loading]);
+
+    useEffect(() => {
+        async function autoLoadReadme() {
+            if (!repoLoaded) return;
+
+            try {
+                const data = await fetchReadme("ai-github-repository-brain");
+                setReadme(data.content);
+                console.log("✅ README loaded successfully");
+            } catch (e: any) {
+                console.error("Failed to auto-load README:", e.message);
+                // Don't show error to user, just log it
+                // README will appear when it's generated
+            }
+        }
+
+        autoLoadReadme();
+    }, [repoLoaded]);
 
     async function handleSubmit() {
         const question = input.trim();
@@ -94,16 +113,6 @@ export default function Chat({
         }
     }
 
-    // Auto-resize textarea
-    function handleInput(e: React.ChangeEvent<HTMLTextAreaElement>) {
-        setInput(e.target.value);
-        const el = textareaRef.current;
-        if (el) {
-            el.style.height = "auto";
-            el.style.height = Math.min(el.scrollHeight, 160) + "px";
-        }
-    }
-
     function handleActionMenu(action: "load" | "dependencies" | "setup" | "readme" | "compare") {
         switch(action) {
             case "load": onLoadRepository(); break;
@@ -115,162 +124,224 @@ export default function Chat({
     }
 
     return (
-        <div className="flex flex-col h-full">
-            {/* Messages area */}
-            <div className="flex-1 overflow-y-auto px-4 py-6 scroll-smooth">
+        <div className="flex flex-col h-full relative">
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
                 {messages.length === 0 ? (
-                    /* Welcome screen */
-                    <div className="flex flex-col items-center justify-center h-full gap-6 text-center max-w-lg mx-auto">
-                        <div className="w-16 h-16 rounded-2xl bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center shadow-xl shadow-emerald-500/5">
-                            <Sparkles size={28} className="text-emerald-400" />
+                    <div className="flex flex-col items-center justify-center h-full text-center max-w-2xl mx-auto">
+                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center mb-4 shadow-lg shadow-blue-500/25">
+                            <Bot size={32} className="text-white" />
                         </div>
-                        <div>
-                            <h2 className="text-2xl font-bold text-white mb-2">
-                                AI Codebase Explorer
-                            </h2>
-                            <div className="text-slate-400 text-sm leading-relaxed prose prose-invert prose-sm">
-                                <ReactMarkdown>{WELCOME}</ReactMarkdown>
-                            </div>
-                        </div>
-                        {!repoLoaded && (
-                            <div className="inline-flex items-center gap-2 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/25 px-4 py-2 rounded-full">
-                                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                                Load a repository from the sidebar to begin
-                            </div>
-                        )}
+                        <ReactMarkdown>{WELCOME}</ReactMarkdown>
                     </div>
                 ) : (
-                    <div className="flex flex-col gap-6 max-w-3xl mx-auto w-full">
-                        {messages.map((msg, i) => (
+                    messages.map((msg, i) => (
+                        <div
+                            key={i}
+                            className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"} animate-fade-in`}
+                        >
                             <div
-                                key={i}
-                                className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"
-                                    }`}
+                                className={`max-w-2xl ${
+                                    msg.role === "user"
+                                        ? "bg-blue-600 text-white rounded-2xl rounded-br-sm px-4 py-3 shadow-lg shadow-blue-600/25"
+                                        : "bg-neutral-800 text-neutral-100 rounded-2xl rounded-bl-sm px-4 py-3 shadow-lg border border-neutral-700"
+                                }`}
                             >
-                                {/* Avatar */}
-                                <div
-                                    className={`w-8 h-8 shrink-0 rounded-lg flex items-center justify-center ${msg.role === "user"
-                                            ? "bg-blue-500/20 border border-blue-500/30"
-                                            : "bg-emerald-500/20 border border-emerald-500/30"
-                                        }`}
-                                >
-                                    {msg.role === "user" ? (
-                                        <User size={14} className="text-blue-400" />
-                                    ) : (
-                                        <Bot size={14} className="text-emerald-400" />
+                                <div className="flex items-start gap-3">
+                                    {msg.role === "assistant" && (
+                                        <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                            <Bot size={14} className="text-white" />
+                                        </div>
                                     )}
-                                </div>
-
-                                {/* Bubble */}
-                                <div
-                                    className={`flex flex-col gap-3 max-w-[85%] ${msg.role === "user" ? "items-end" : "items-start"
-                                        }`}
-                                >
-                                    <div
-                                        className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === "user"
-                                                ? "bg-blue-600/80 text-white rounded-tr-sm"
-                                                : msg.error
-                                                    ? "bg-red-500/10 border border-red-500/20 text-red-300 rounded-tl-sm"
-                                                    : "bg-slate-800/80 border border-white/6 text-slate-200 rounded-tl-sm"
-                                            }`}
-                                    >
-                                        {msg.role === "user" ? (
-                                            <p>{msg.text}</p>
+                                    <div className="flex-1 space-y-2">
+                                        {msg.error ? (
+                                            <div className="flex items-center gap-2 text-red-400 text-sm">
+                                                <span className="font-medium">Error:</span>
+                                                <span>{msg.text}</span>
+                                            </div>
                                         ) : (
-                                            <div className="prose prose-invert prose-sm max-w-none">
-                                                <ReactMarkdown>{msg.text}</ReactMarkdown>
+                                            <div className="prose prose-invert prose-neutral max-w-none">
+                                                <ReactMarkdown
+                                                    components={{
+                                                        code: ({ node, className, children, ...props }) => (
+                                                            <code className={`${className} bg-neutral-700 px-1.5 py-0.5 rounded text-xs`} {...props}>
+                                                                {children}
+                                                            </code>
+                                                        ),
+                                                        pre: ({ children }) => {
+                                                            const codeText = String(children).replace(/^\n+|\n+$/g, "");
+                                                            return (
+                                                                <div className="relative">
+                                                                    <pre className="bg-neutral-900 p-3 rounded-lg overflow-x-auto text-sm">
+                                                                        <code>{codeText}</code>
+                                                                    </pre>
+                                                                    <button
+                                                                        onClick={() => navigator.clipboard.writeText(codeText)}
+                                                                        className="absolute top-2 right-2 p-1 rounded bg-neutral-700 hover:bg-neutral-600 transition-colors"
+                                                                        title="Copy code"
+                                                                    >
+                                                                        <Copy size={14} />
+                                                                    </button>
+                                                                </div>
+                                                            );
+                                                        },
+                                                        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                                                        ul: ({ children }) => <ul className="list-disc list-inside space-y-1 mb-2">{children}</ul>,
+                                                        ol: ({ children }) => <ol className="list-decimal list-inside space-y-1 mb-2">{children}</ol>,
+                                                        strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
+                                                        em: ({ children }) => <em className="italic text-neutral-300">{children}</em>,
+                                                    }}
+                                                >
+                                                    {msg.text}
+                                                </ReactMarkdown>
+                                            </div>
+                                        )}
+                                        {msg.chunks && msg.chunks.length > 0 && (
+                                            <div className="border-t border-neutral-700 pt-2 mt-2">
+                                                <div className="flex items-center gap-2 text-xs text-neutral-400 mb-2">
+                                                    <Layers size={12} />
+                                                    <span>Sources</span>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    {msg.chunks.map((chunk, idx) => (
+                                                        <div key={idx} className="text-xs text-neutral-500 font-mono bg-neutral-900/50 px-2 py-1 rounded">
+                                                            {chunk.file_path}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {msg.role === "assistant" && (
+                                            <div className="flex items-center gap-2 text-xs text-neutral-500">
+                                                <button
+                                                    onClick={() => navigator.clipboard.writeText(msg.text)}
+                                                    className="hover:text-neutral-300 transition-colors"
+                                                    title="Copy message"
+                                                >
+                                                    Copy
+                                                </button>
+                                                <span>•</span>
+                                                <span>{new Date().toLocaleTimeString()}</span>
                                             </div>
                                         )}
                                     </div>
-
-                                    {/* Code snippet cards */}
-                                    {msg.chunks && msg.chunks.length > 0 && (
-                                        <div className="w-full flex flex-col gap-2">
-                                            <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                                                <Layers size={11} />
-                                                <span>
-                                                    {msg.chunks.length} code section
-                                                    {msg.chunks.length !== 1 ? "s" : ""} retrieved
-                                                </span>
-                                            </div>
-                                            {msg.chunks.map((chunk, j) => (
-                                                <CodeBlock key={j} chunk={chunk} rank={j + 1} />
-                                            ))}
+                                    {msg.role === "user" && (
+                                        <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                            <User size={14} className="text-white" />
                                         </div>
                                     )}
                                 </div>
                             </div>
-                        ))}
-
-                        {/* Typing indicator */}
-                        {loading && (
-                            <div className="flex gap-3 flex-row">
-                                <div className="w-8 h-8 shrink-0 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center">
-                                    <Bot size={14} className="text-emerald-400" />
+                        </div>
+                    ))
+                )}
+                {loading && (
+                    <div className="flex justify-start">
+                        <div className="bg-neutral-800 rounded-2xl rounded-bl-sm px-4 py-3 shadow-lg border border-neutral-700">
+                            <div className="flex items-center gap-3">
+                                <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                                    <Bot size={14} className="text-white" />
                                 </div>
-                                <div className="bg-slate-800/80 border border-white/6 rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-2">
-                                    <span className="text-sm text-slate-400">AI is thinking</span>
-                                    <span className="flex gap-1">
-                                        {[0, 1, 2].map((i) => (
-                                            <span
-                                                key={i}
-                                                className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce"
-                                                style={{ animationDelay: `${i * 0.15}s` }}
-                                            />
-                                        ))}
-                                    </span>
+                                <div className="flex space-x-1">
+                                    <div className="w-2 h-2 bg-neutral-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></div>
+                                    <div className="w-2 h-2 bg-neutral-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></div>
+                                    <div className="w-2 h-2 bg-neutral-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></div>
                                 </div>
                             </div>
-                        )}
+                        </div>
                     </div>
                 )}
                 <div ref={bottomRef} />
             </div>
 
-            {/* Input bar */}
-            <div className="p-4 border-t border-white/6 bg-slate-950/60 backdrop-blur-sm">
-                <div className="max-w-3xl mx-auto flex flex-col gap-2 w-full">
-                    {actionStatus && (
-                        <div className="text-blue-400 text-xs px-2 animate-pulse font-medium flex items-center gap-2">
-                            {actionStatus}
+            {/* README Display */}
+            {repoLoaded && (
+                <div className="px-6 pb-4">
+                    {readme ? (
+                        <div className="bg-neutral-900/60 backdrop-blur-sm rounded-2xl p-6 border border-neutral-800/50">
+                            <h2 className="text-lg font-semibold mb-4 text-white flex items-center gap-2">
+                                📄 Generated README
+                            </h2>
+                            <div className="prose prose-invert prose-neutral max-w-none text-sm text-neutral-300">
+                                <ReactMarkdown>{readme}</ReactMarkdown>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="bg-neutral-900/30 backdrop-blur-sm rounded-2xl p-6 border border-neutral-800/30">
+                            <div className="text-center text-neutral-500 text-sm">
+                                <div className="w-12 h-12 rounded-full bg-neutral-800 flex items-center justify-center mx-auto mb-3">
+                                    📄
+                                </div>
+                                <p>README not generated yet</p>
+                                <p className="text-xs mt-1">Use the "Generate README" button to create one</p>
+                            </div>
                         </div>
                     )}
-                    <div className="flex gap-3 items-end w-full">
-                        <div className="flex-1 relative">
-                            <textarea
-                            ref={textareaRef}
-                            value={input}
-                            onChange={handleInput}
-                            onKeyDown={handleKeyDown}
-                            placeholder={
-                                repoLoaded
-                                    ? "Ask anything about the codebase… (Enter to send)"
-                                    : "Load a repository first…"
-                            }
-                            disabled={!repoLoaded || loading}
-                            rows={1}
-                            className="w-full bg-slate-800/80 border border-white/10 rounded-xl pl-4 pr-14 py-3 text-sm text-slate-200 placeholder-slate-600 resize-none focus:outline-none focus:ring-1 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all disabled:opacity-40 disabled:cursor-not-allowed leading-relaxed"
-                        />
-                        <FloatingActionMenu 
-                            onAction={handleActionMenu} 
-                            disabled={!repoLoaded || !isBackendActive} 
-                        />
-                    </div>
-                    <button
-                        onClick={handleSubmit}
-                        disabled={!repoLoaded || loading || !input.trim()}
-                        className="w-10 h-10 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-700 disabled:text-slate-600 text-black flex items-center justify-center transition-all duration-200 shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 active:scale-95 disabled:cursor-not-allowed shrink-0"
-                    >
-                        <Send size={16} />
-                    </button>
-                    </div>
                 </div>
-                <p className="text-center text-xs text-slate-700 mt-2">
-                    Press <kbd className="text-slate-600 font-mono">Enter</kbd> to send ·{" "}
-                    <kbd className="text-slate-600 font-mono">Shift+Enter</kbd> for new
-                    line
-                </p>
+            )}
+
+            {/* Input area */}
+            <div className="border-t border-neutral-800 bg-neutral-900/40 backdrop-blur-sm p-4">
+                <div className="max-w-4xl mx-auto">
+                    {!repoLoaded ? (
+                        <div className="flex items-center justify-center py-8">
+                            <div className="text-center">
+                                <div className="w-12 h-12 rounded-full bg-neutral-800 flex items-center justify-center mx-auto mb-3">
+                                    <Bot size={24} className="text-neutral-400" />
+                                </div>
+                                <p className="text-neutral-400 text-sm mb-2">No repository loaded</p>
+                                <button
+                                    onClick={onLoadRepository}
+                                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
+                                >
+                                    Load Repository
+                                </button>
+                            </div>
+                        </div>
+                    ) : !isBackendActive ? (
+                        <div className="flex items-center justify-center py-8">
+                            <div className="text-center">
+                                <div className="w-12 h-12 rounded-full bg-red-900/20 flex items-center justify-center mx-auto mb-3">
+                                    <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
+                                </div>
+                                <p className="text-red-400 text-sm">Backend is offline</p>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex gap-3">
+                            <textarea
+                                ref={textareaRef}
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                placeholder="Ask anything about your codebase..."
+                                className="flex-1 bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-white placeholder-neutral-500 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                                rows={1}
+                                disabled={loading}
+                            />
+                            <button
+                                onClick={handleSubmit}
+                                disabled={!input.trim() || loading}
+                                className="bg-blue-600 hover:bg-blue-700 disabled:bg-neutral-700 disabled:text-neutral-500 text-white p-3 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 disabled:scale-100 disabled:cursor-not-allowed"
+                            >
+                                <Send size={20} className={loading ? "animate-pulse" : ""} />
+                            </button>
+                        </div>
+                    )}
+                    {actionStatus && (
+                        <div className="mt-3 text-center">
+                            <span className="text-xs text-neutral-500 bg-neutral-800 px-3 py-1 rounded-full inline-block">
+                                {actionStatus}
+                            </span>
+                        </div>
+                    )}
+                </div>
             </div>
+            {/* Floating Action Menu */}
+            <FloatingActionMenu
+                onAction={handleActionMenu}
+                disabled={!repoLoaded || !isBackendActive}
+            />
         </div>
     );
 }

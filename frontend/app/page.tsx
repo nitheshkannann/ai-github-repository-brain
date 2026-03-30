@@ -169,11 +169,11 @@ export default function Home() {
   }
 
   return (
-    <div className="flex h-screen bg-[#0d1117] text-white overflow-hidden">
+    <div className="flex h-screen bg-gradient-to-br from-neutral-950 via-neutral-900 to-neutral-950 text-white overflow-hidden">
       {/* Sidebar */}
       <aside
-        className={`${sidebarOpen ? "w-72" : "w-0"
-          } shrink-0 transition-all duration-300 overflow-hidden border-r border-white/6 bg-slate-950/80`}
+        className={`${sidebarOpen ? "w-80" : "w-0"
+          } shrink-0 transition-all duration-300 ease-in-out overflow-hidden border-r border-neutral-800/50 bg-neutral-900/40 backdrop-blur-xl`}
       >
         <Sidebar
           repoPath={repoPath}
@@ -210,30 +210,39 @@ export default function Home() {
       {/* Main area */}
       <main className="flex-1 flex flex-col min-w-0">
         {/* Top bar */}
-        <header className="h-12 shrink-0 flex items-center px-4 border-b border-white/6 bg-slate-950/60 backdrop-blur-sm gap-3">
+        <header className="h-16 shrink-0 flex items-center px-6 border-b border-neutral-800/50 bg-neutral-900/30 backdrop-blur-md gap-4 shadow-sm">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="text-slate-500 hover:text-white transition-colors p-1 rounded-md hover:bg-white/5"
+            className="text-neutral-400 hover:text-white transition-all duration-200 p-2.5 rounded-xl hover:bg-white/5 active:scale-95"
             aria-label="Toggle sidebar"
           >
             {sidebarOpen ? (
-              <PanelLeftClose size={18} />
+              <PanelLeftClose size={20} />
             ) : (
-              <PanelLeftOpen size={18} />
+              <PanelLeftOpen size={20} />
             )}
           </button>
 
-          <div className="h-4 w-px bg-white/10" />
+          <div className="h-8 w-px bg-neutral-700" />
 
-          <span className="text-sm font-medium text-slate-300">
-            AI GitHub Repository Brain
-          </span>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 shadow-lg shadow-purple-600/25">
+              <span className="text-white font-bold text-lg">🧠</span>
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-white">Repo Brain</h1>
+              <p className="text-xs text-neutral-400">AI-Powered Code Analysis</p>
+            </div>
+          </div>
 
           {repoLoaded && (
             <>
-              <div className="h-4 w-px bg-white/10" />
-              <div className="flex items-center gap-1.5 text-xs">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <div className="h-8 w-px bg-neutral-700" />
+              <div className="flex items-center gap-2.5 text-sm">
+                <div className="relative">
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-lg shadow-emerald-500/50" />
+                  <div className="absolute inset-0 w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping opacity-20" />
+                </div>
                 <span className="text-emerald-400 font-medium">
                   Repository indexed
                 </span>
@@ -241,14 +250,22 @@ export default function Home() {
             </>
           )}
 
-          <div className="ml-auto flex items-center gap-2 text-xs text-slate-600">
-            <span>Top-K:</span>
-            <span className="font-mono text-slate-400">{topK}</span>
+          <div className="ml-auto flex items-center gap-4">
+            <div className="flex items-center gap-2.5 text-xs text-neutral-400 bg-neutral-800/50 px-3 py-1.5 rounded-full border border-neutral-700">
+              <span className="font-medium">Top-K:</span>
+              <span className="font-mono text-neutral-300">{topK}</span>
+            </div>
+            {!isBackendActive && (
+              <div className="flex items-center gap-2 text-xs text-red-400 bg-red-900/20 px-3 py-1.5 rounded-full border border-red-500/30">
+                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                <span className="font-medium">Backend offline</span>
+              </div>
+            )}
           </div>
         </header>
 
         {/* Chat takes the rest */}
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 flex flex-col min-w-0 bg-gradient-to-br from-neutral-950 via-neutral-900/50 to-neutral-950">
           <Chat 
             topK={topK} 
             repoLoaded={repoLoaded} 
@@ -261,6 +278,14 @@ export default function Home() {
             actionStatus={actionStatus}
           />
         </div>
+        {/* Footer */}
+        <footer className="h-10 flex items-center justify-center text-xs text-neutral-600 border-t border-neutral-800/50 bg-neutral-900/30 backdrop-blur-sm">
+          <div className="flex items-center gap-2">
+            <span>Powered by</span>
+            <span className="text-neutral-400">AI + FAISS</span>
+            <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+          </div>
+        </footer>
       </main>
     </div>
   );

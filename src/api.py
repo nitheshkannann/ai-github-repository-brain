@@ -63,7 +63,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -143,6 +143,10 @@ class AskResponse(BaseModel):
 
 @app.get("/")
 def root():
+    return {"status": "ok"}
+
+@app.get("/health")
+def health():
     return {"status": "ok"}
 
 
@@ -405,20 +409,20 @@ def api_generate_requirements(body: GenerateRequirementsRequest):
     Generate a list of Python dependencies for a given repository.
     Does not use the LLM or FAISS retriever.
     """
-    repo = body.repo_path.strip()
-    if not repo:
-        raise HTTPException(status_code=400, detail="Repository path cannot be empty")
-
-    if repo.startswith("http://") or repo.startswith("https://"):
-        repo = clone_repo(repo)
-
-    if not Path(repo).exists():
-        raise HTTPException(status_code=400, detail=f"Path does not exist: {repo}")
-
-    logger.info("Generating requirements...")
-    print("Generating requirements...")
-
     try:
+        repo = body.repo_path.strip()
+        if not repo:
+            raise HTTPException(status_code=400, detail="Repository path cannot be empty")
+
+        if repo.startswith("http://") or repo.startswith("https://"):
+            repo = clone_repo(repo)
+
+        if not Path(repo).exists():
+            raise HTTPException(status_code=400, detail=f"Path does not exist: {repo}")
+
+        logger.info("Generating requirements...")
+        print("Generating requirements...")
+
         # Run dependency analyzer
         result = generate_requirements(repo)
         
@@ -444,20 +448,20 @@ def api_generate_readme(body: GenerateReadmeRequest):
     """
     Generate a README.md using repository structure and dependencies data.
     """
-    repo = body.repo_path.strip()
-    if not repo:
-        raise HTTPException(status_code=400, detail="Repository path cannot be empty")
-
-    if repo.startswith("http://") or repo.startswith("https://"):
-        repo = clone_repo(repo)
-
-    if not Path(repo).exists():
-        raise HTTPException(status_code=400, detail=f"Path does not exist: {repo}")
-
-    logger.info("Generating README...")
-    print("Generating README...")
-
     try:
+        repo = body.repo_path.strip()
+        if not repo:
+            raise HTTPException(status_code=400, detail="Repository path cannot be empty")
+
+        if repo.startswith("http://") or repo.startswith("https://"):
+            repo = clone_repo(repo)
+
+        if not Path(repo).exists():
+            raise HTTPException(status_code=400, detail=f"Path does not exist: {repo}")
+
+        logger.info("Generating README...")
+        print("Generating README...")
+
         # Step 1: Use repo_parser -> get files
         files = get_code_files(repo)
         
@@ -481,76 +485,67 @@ def api_generate_readme(body: GenerateReadmeRequest):
         # Step 5: Send to LLM with prompt
         project_name = Path(repo).name
 
-        sys_prompt = "You are an expert software engineer and technical writer."
-        user_prompt = f"""Generate a high-quality, professional, GitHub-ready README.md using the provided data. Do NOT hallucinate technologies or assume frameworks not present.
+        # Derive insights
+        python_deps = req_data.get("python", [])
+        js_deps = req_data.get("javascript", [])
+        entry_points = req_data.get("entry_points", {})
+        languages = []
+        if python_deps: languages.append("Python")
+        if js_deps: languages.append("JavaScript")
+        key_files = [f for f in file_tree if any(f.endswith(x) for x in ["main.py", "app.py", "index.js", "index.ts", "server.py", "main.js"])][:10]
+        folder_summary = {}
+        for f in file_tree:
+            top = f.split("/")[0]
+            folder_summary.setdefault(top, 0)
+            folder_summary[top] += 1
+        folder_lines = [f"- {folder}/ ({cnt} files)" for folder, cnt in sorted(folder_summary.items())[:10]]
+
+        # Framework-specific guidance
+        framework_hints = []
+        if "fastapi" in python_deps:
+            framework_hints.append("This appears to be a FastAPI web API.")
+        if "flask" in python_deps:
+            framework_hints.append("This appears to be a Flask web application.")
+        if "react" in js_deps:
+            framework_hints.append("This appears to use React for the frontend.")
+        if "next" in js_deps or "next.js" in js_deps:
+            framework_hints.append("This appears to be a Next.js application.")
+        if "express" in js_deps:
+            framework_hints.append("This appears to be an Express.js backend.")
+        if "django" in python_deps:
+            framework_hints.append("This appears to be a Django web application.")
+
+        sys_prompt = "You are an expert software engineer and technical writer. Write a professional, GitHub-ready README.md that is specific to the provided project data. Do NOT hallucinate technologies not present. Avoid generic boilerplate about FAISS, chunking, or LLMs unless the repository actually contains such code."
+
+        user_prompt = f"""Generate a high-quality, professional README.md for this repository using ONLY the data provided.
 
 Project Name: {project_name}
+Detected Languages: {', '.join(languages) if languages else 'None'}
+Key Files: {', '.join(key_files) if key_files else 'None'}
+Dependencies:
+- Python: {', '.join(python_deps[:10]) if python_deps else 'None'}
+- JavaScript: {', '.join(js_deps[:10]) if js_deps else 'None'}
+Entry Points: {entry_points}
+Project Structure (top folders):
+{chr(10).join(folder_lines) if folder_lines else 'None'}
 
-Project Data:
-{context_data}
+Framework insights:
+{chr(10).join(f"- {hint}" for hint in framework_hints) if framework_hints else 'None'}
 
-Requirements for the README:
+Instructions:
+- Title: "# {project_name}"
+- Write a concise Overview reflecting the actual files and dependencies.
+- If Python is present, include an Installation section with pip/requirements.txt.
+- If JavaScript is present, include an Installation section with npm.
+- If both are present, include both.
+- Include a Usage section that references detected entry points (e.g. python src/app.py, npm start, etc.).
+- Include a Project Structure section listing the top folders shown above.
+- Include a Features section based on detected dependencies and purpose (e.g., API, web app, CLI tool).
+- If a framework is hinted, tailor the explanation accordingly (e.g., FastAPI routes, React components, Express endpoints).
+- Do NOT include generic sections like "FAISS, chunking, embeddings" unless explicitly present in the repo.
+- Keep the tone professional and specific to this project.
 
-1. Title:
-   - Use the repository name dynamically.
-   - Format: "# {project_name}"
-   - Avoid generic titles like "Project Documentation".
-
-2. Add the following structured sections:
-
-## 📌 Overview
-- What the project does (clear, concise).
-- Use repo content and detected purpose.
-
-## 🏗 Architecture
-- Explain the system pipeline clearly with bullet points, focusing on:
-  - Repo Parser
-  - Chunker
-  - Embedder
-  - FAISS Retriever
-  - LLM Layer
-
-## 🛠 Tech Stack
-- Split into:
-  - Python
-  - JavaScript (if exists)
-- Use detected dependencies.
-
-## 🚀 Installation
-For Python, include:
-```bash
-python -m venv .venv
-# activate env
-pip install -r requirements.txt
-```
-For JS (if exists), include:
-```bash
-npm install
-```
-
-## ▶️ Usage
-- Example command (e.g., `python src/app.py --repo <path>` or `uvicorn ...`).
-- Explain what the user can ask or do.
-
-## 💡 Example
-- Show a sample question + answer.
-
-## 📂 Project Structure
-- Show key folders explicitly: src/, frontend/, data/ (based on files detected).
-
-## ⚙️ Features
-- AI code understanding
-- FAISS search
-- Dependency generator
-- Setup guide
-- README generator
-
-3. Tone:
-- Clean and Professional.
-- No generic AI text or conversational filler (e.g. "Here is your README").
-- Concise but informative.
-
-Output ONLY clean markdown string compatible with GitHub README.md. Do not wrap in ```markdown if possible."""
+Output ONLY clean markdown compatible with GitHub README.md. Do not wrap in ```markdown."""
 
         models_to_try = [
             "gemini/gemini-2.5-flash",
@@ -610,48 +605,49 @@ def api_compare_readme(body: CompareReadmeRequest):
     """
     Compare existing README.md with an AI-generated README and provide analysis.
     """
-    repo = body.repo_path.strip()
-    if not repo:
-        raise HTTPException(status_code=400, detail="Repository path cannot be empty")
-
-    if repo.startswith("http://") or repo.startswith("https://"):
-        repo = clone_repo(repo)
-
-    repo_path_obj = Path(repo)
-    if not repo_path_obj.exists():
-        raise HTTPException(status_code=400, detail=f"Path does not exist: {repo}")
-
-    # 1. Detect if repo has existing README
-    existing_readme_content = ""
-    readme_candidates = ["README.md", "readme.md", "Readme.md", "README"]
-    found_readme = False
-    for candidate in readme_candidates:
-        candidate_path = repo_path_obj / candidate
-        if candidate_path.exists() and candidate_path.is_file():
-            try:
-                with open(candidate_path, "r", encoding="utf-8") as f:
-                    existing_readme_content = f.read()
-                found_readme = True
-                break
-            except Exception:
-                pass
-                
-    if not found_readme:
-        raise HTTPException(status_code=404, detail="No README found in the repository root.")
-
-    # 2. Generate new README by reusing the logic (this relies on the same endpoint code)
-    # We call our own api_generate_readme
     try:
-        gen_response = api_generate_readme(GenerateReadmeRequest(repo_path=body.repo_path))
-        generated_readme_content = gen_response.readme_content
-    except HTTPException as e:
-        raise e
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to generate new README: {str(exc)}")
+        repo = body.repo_path.strip()
+        if not repo:
+            raise HTTPException(status_code=400, detail="Repository path cannot be empty")
 
-    # 3. Compare both using LLM
-    sys_prompt = "You are an expert technical writer and code reviewer."
-    user_prompt = f"""Compare the following two GitHub READMEs for a project.
+        if repo.startswith("http://") or repo.startswith("https://"):
+            repo = clone_repo(repo)
+
+        repo_path_obj = Path(repo)
+        if not repo_path_obj.exists():
+            raise HTTPException(status_code=400, detail=f"Path does not exist: {repo}")
+
+        # 1. Detect if repo has existing README
+        existing_readme_content = ""
+        readme_candidates = ["README.md", "readme.md", "Readme.md", "README"]
+        found_readme = False
+        for candidate in readme_candidates:
+            candidate_path = repo_path_obj / candidate
+            if candidate_path.exists() and candidate_path.is_file():
+                try:
+                    with open(candidate_path, "r", encoding="utf-8") as f:
+                        existing_readme_content = f.read()
+                    found_readme = True
+                    break
+                except Exception:
+                    pass
+                
+        if not found_readme:
+            raise HTTPException(status_code=404, detail="No README found in the repository root.")
+
+        # 2. Generate new README by reusing the logic (this relies on the same endpoint code)
+        # We call our own api_generate_readme
+        try:
+            gen_response = api_generate_readme(GenerateReadmeRequest(repo_path=body.repo_path))
+            generated_readme_content = gen_response.readme_content
+        except HTTPException as e:
+            raise e
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"Failed to generate new README: {str(exc)}")
+
+        # 3. Compare both using LLM
+        sys_prompt = "You are an expert technical writer and code reviewer."
+        user_prompt = f"""Compare the following two GitHub READMEs for a project.
 
 Existing README:
 ```markdown
@@ -679,61 +675,196 @@ Return ONLY a valid JSON object matching exactly this schema, without any markdo
   "score_generated": integer
 }}"""
 
-    models_to_try = [
-        "gemini/gemini-2.5-flash",
-        "gemini/gemini-2.0-flash",
-        "gemini/gemini-1.5-flash",
-        "gemini/gemini-1.5-flash-latest"
-    ]
-    
-    analysis_data = None
-    last_error = None
+        models_to_try = [
+            "gemini/gemini-2.5-flash",
+            "gemini/gemini-2.0-flash",
+            "gemini/gemini-1.5-flash",
+            "gemini/gemini-1.5-flash-latest"
+        ]
+        
+        analysis_data = None
+        last_error = None
 
-    for model_name in models_to_try:
-        try:
-            response = litellm.completion(
-                model=model_name,
-                messages=[
-                    {"role": "system", "content": sys_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                # some litellm providers support response_format={"type": "json_object"} but text parsing is safer across all gemini models
-            )
-            raw_content = response.choices[0].message.content
-            if raw_content.startswith("```json"):
-                raw_content = raw_content[7:]
-            if raw_content.startswith("```"):
-                raw_content = raw_content[3:]
-            if raw_content.endswith("```"):
-                raw_content = raw_content[:-3]
-                
-            analysis_dict = json.loads(raw_content.strip())
-            
-            # Simple validation to avoid 500 crashes
-            if "missing_sections" in analysis_dict and "score_existing" in analysis_dict:
-                analysis_data = ReadmeAnalysis(
-                    missing_sections=analysis_dict.get("missing_sections", []),
-                    improvements=analysis_dict.get("improvements", []),
-                    score_existing=int(analysis_dict.get("score_existing", 0)),
-                    score_generated=int(analysis_dict.get("score_generated", 0))
+        for model_name in models_to_try:
+            try:
+                response = litellm.completion(
+                    model=model_name,
+                    messages=[
+                        {"role": "system", "content": sys_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    # some litellm providers support response_format={"type": "json_object"} but text parsing is safer across all gemini models
                 )
-                break
-        except Exception as e:
-            last_error = e
-            continue
+                raw_content = response.choices[0].message.content
+                if raw_content.startswith("```json"):
+                    raw_content = raw_content[7:]
+                if raw_content.startswith("```"):
+                    raw_content = raw_content[3:]
+                if raw_content.endswith("```"):
+                    raw_content = raw_content[:-3]
+                    
+                analysis_dict = json.loads(raw_content.strip())
+                
+                # Simple validation to avoid 500 crashes
+                if "missing_sections" in analysis_dict and "score_existing" in analysis_dict:
+                    analysis_data = ReadmeAnalysis(
+                        missing_sections=analysis_dict.get("missing_sections", []),
+                        improvements=analysis_dict.get("improvements", []),
+                        score_existing=int(analysis_dict.get("score_existing", 0)),
+                        score_generated=int(analysis_dict.get("score_generated", 0))
+                    )
+                    break
+            except Exception as e:
+                last_error = e
+                continue
 
-    if not analysis_data:
-        analysis_data = ReadmeAnalysis(
-            missing_sections=["Analysis failed."],
-            improvements=[f"LLM Error: {last_error}"],
-            score_existing=0,
-            score_generated=0
+        if not analysis_data:
+            analysis_data = ReadmeAnalysis(
+                missing_sections=["Analysis failed."],
+                improvements=[f"LLM Error: {last_error}"],
+                score_existing=0,
+                score_generated=0
+            )
+
+        return CompareReadmeResponse(
+            existing_readme=existing_readme_content,
+            generated_readme=generated_readme_content,
+            analysis=analysis_data
         )
 
-    return CompareReadmeResponse(
-        existing_readme=existing_readme_content,
-        generated_readme=generated_readme_content,
-        analysis=analysis_data
-    )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Error comparing README")
+        raise HTTPException(status_code=500, detail=str(exc))
+        
+# ─────────────────────────────────────────────────────────────
+# 🔥 WEBHOOK + README STORAGE (FINAL STABLE VERSION)
+# ─────────────────────────────────────────────────────────────
+
+from fastapi import Request
+
+@app.post("/webhook/github")
+async def github_webhook(request: Request):
+    """
+    GitHub webhook endpoint:
+    - Receives push event
+    - Clones or updates repo
+    - Generates README
+    - Stores it locally
+    """
+    try:
+        payload = await request.json()
+
+        # ✅ Only process push events
+        if "commits" not in payload:
+            return {"status": "ignored", "message": "Not a push event"}
+
+        if "repository" not in payload:
+            return {"status": "ignored", "message": "No repository data"}
+
+        repo_url = payload["repository"]["clone_url"]
+        repo_name = repo_url.split("/")[-1].replace(".git", "")
+
+        print(f"[Webhook] Push received for: {repo_name}")
+
+        # ✅ Clone repo
+        local_path = clone_repo(repo_url)
+
+        # 🔥 Ensure latest code is pulled (UPDATED FIX)
+        try:
+            result = subprocess.run(
+                ["git", "-C", local_path, "pull"],
+                capture_output=True,
+                text=True
+            )
+
+            if result.returncode == 0:
+                print("[Webhook] Repo updated:", result.stdout)
+            else:
+                print("[Webhook] Pull error:", result.stderr)
+
+        except Exception as e:
+            print("[Webhook] Pull failed:", str(e))
+
+        # ✅ Generate README
+        readme_response = api_generate_readme(
+            GenerateReadmeRequest(repo_path=local_path)
+        )
+        readme_content = readme_response.readme_content
+
+        # ✅ Store README
+        save_dir = Path("data/generated_readmes")
+        save_dir.mkdir(parents=True, exist_ok=True)
+
+        file_path = save_dir / f"{repo_name}.md"
+
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(readme_content)
+
+        print(f"[Webhook] README stored at: {file_path}")
+
+        return {
+            "status": "success",
+            "repo": repo_name,
+            "stored_at": str(file_path)
+        }
+
+    except Exception as e:
+        print("[Webhook Error]", str(e))
+        return {
+            "status": "error",
+            "message": str(e)
+        }
 
 
+@app.get("/get_saved_readme")
+def get_saved_readme(repo_name: str):
+    """
+    Fetch stored README generated via webhook
+    """
+    try:
+        file_path = Path("data/generated_readmes") / f"{repo_name}.md"
+
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="README not found")
+
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        return {
+            "repo": repo_name,
+            "content": content
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ─────────────────────────────────────────────────────────────
+# 📥 GET SAVED README API (REQUIRED FOR FRONTEND)
+# ─────────────────────────────────────────────────────────────
+
+@app.get("/get_readme")
+def get_readme(repo_name: str):
+    """
+    Fetch generated README for frontend
+    """
+    try:
+        file_path = Path("data/generated_readmes") / f"{repo_name}.md"
+
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="README not found")
+
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        return {
+            "content": content
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
