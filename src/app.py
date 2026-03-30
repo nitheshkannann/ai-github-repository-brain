@@ -34,8 +34,8 @@ from pydantic import BaseModel
 # ── Make sure sibling modules in src/ are importable ──────────────────────────
 from repo_parser import get_code_files           # type: ignore[import]
 from chunker import chunk_code_files             # type: ignore[import]
-from embedder import load_model, generate_embeddings  # type: ignore[import]
-from retriever import FAISSRetriever             # type: ignore[import]
+# NOTE: embedder / retriever are imported LAZILY inside build_pipeline()
+# so that heavy ML libs (torch, faiss, sentence-transformers) never load at startup.
 import litellm
 
 # Only show WARNING+ from libraries so our own prints stay clean
@@ -51,6 +51,11 @@ app = FastAPI(
     description="Ask questions about a codebase",
     version="1.0.0"
 )
+
+@app.on_event("startup")
+async def startup_event():
+    """Lightweight startup — NO model loading, NO FAISS, NO torch."""
+    print("[Startup] ✅ App started successfully (lightweight mode — ML loads on first /load_repo call)")
 
 # ── Add CORS Middleware ───────────────────────────────────────────────────────
 app.add_middleware(
@@ -244,15 +249,18 @@ def build_pipeline(repo_path: str, top_k: int = 3):
     Runs the one-time setup:
       1. Parse all code files from the repository.
       2. Split them into chunks.
-      3. Load the embedding model.
+      3. Load the embedding model (imported HERE, not at module level).
       4. Generate embeddings for every chunk.
       5. Build the FAISS index.
 
     Returns:
         model      : SentenceTransformer (reused for query embedding)
         retriever  : FAISSRetriever (ready to search)
-        top_k      : int (passed through for convenience)
     """
+    # ── Lazy imports — keeps startup fast on Render ──────────────────────────
+    from embedder import load_model, generate_embeddings  # type: ignore[import]
+    from retriever import FAISSRetriever                  # type: ignore[import]
+
     print("\n🔍  Scanning repository ...")
     files = get_code_files(repo_path)
     if not files:
@@ -285,7 +293,7 @@ def build_pipeline(repo_path: str, top_k: int = 3):
 def answer_query(
     query: str,
     model,
-    retriever: FAISSRetriever,
+    retriever,        # FAISSRetriever — not imported globally to keep startup fast
     top_k: int
 ) -> None:
     """
@@ -391,24 +399,7 @@ def answer_query(
 
 
 # ── CLI entry point ───────────────────────────────────────────────────────────
-
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="AI GitHub Repository Brain — ask questions about a codebase."
-    )
-    parser.add_argument(
-        "--repo",
-        type=str,
-        default=str(Path(__file__).resolve().parent.parent),
-        help="Path to the repository to analyse (default: project root)"
-    )
-    parser.add_argument(
-        "--top-k",
-        type=int,
-        default=3,
-        help="Number of code chunks to retrieve per query (default: 3)"
-    )
-    return parser.parse_args()
+# (parse_args defined once below, near main_cli)
 
 
 # ── FastAPI Endpoints ────────────────────────────────────────────────────────
@@ -473,6 +464,10 @@ async def load_repo(request: LoadRepoRequest):
         
         # Generate embeddings and build index
         try:
+            # Lazy imports — heavy ML libs only loaded here, never at startup
+            from embedder import load_model, generate_embeddings  # type: ignore[import]
+            from retriever import FAISSRetriever                  # type: ignore[import]
+
             print(f"[API] 🤖 Loading embedding model...")
             model = load_model()
             
