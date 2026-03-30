@@ -11,6 +11,16 @@ CLI (backward compatibility):
     python src/app.py [--repo PATH] [--top-k N]
 """
 
+import socket
+import os
+
+port = int(os.environ.get("PORT", 10000))
+
+s = socket.socket()
+s.bind(("0.0.0.0", port))
+s.listen(1)
+print(f"[Render Fix] Port {port} opened early")
+
 import sys
 import argparse
 import logging
@@ -735,10 +745,6 @@ if __name__ == "__main__":
         print("   Server: http://localhost:8000")
         print("   Docs:   http://localhost:8000/docs")
         print("=" * 60 + "\n")
+        
         port = int(os.environ.get("PORT", 10000))
-
-        uvicorn.run(
-            "src.app:app",
-            host="0.0.0.0",
-            port=port
-        )
+        uvicorn.run("src.app:app", host="0.0.0.0", port=port)
