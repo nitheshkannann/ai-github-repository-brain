@@ -347,22 +347,17 @@ def answer_query(
     print("\n  🤖 Thinking...\n")
     try:
         models_to_try = [
-            "gemini/gemini-2.5-flash",
-            "gemini/gemini-2.5-pro",
-            "gemini/gemini-2.0-flash",
-            "gemini/gemini-1.5-flash",
-            "gemini/gemini-1.5-flash-latest",
-            "gemini/gemini-1.5-pro",
-            "gemini/gemini-1.5-pro-latest",
-            "gemini/gemini-1.5-flash-001",
-            "gemini/gemini-1.5-flash-002",
-            "gemini/gemini-pro"
+            "gemini-1.5-flash-latest",
+            "gemini-1.5-flash",
+            "gemini-2.0-flash-exp",
+            "gemini-1.5-pro-latest"
         ]
         explanation = None
         last_error = None
         
         for model_name in models_to_try:
             try:
+                print(f"[API] 🤖 Trying model: {model_name}")
                 response = litellm.completion(
                     model=model_name,
                     messages=[
@@ -547,14 +542,15 @@ async def ask(request: AskRequest):
         last_error = None
 
         models_to_try = [
-            "gemini/gemini-2.5-flash",
-            "gemini/gemini-2.5-pro",
-            "gemini/gemini-2.0-flash",
-            "gemini/gemini-1.5-flash",
+            "gemini-1.5-flash-latest",
+            "gemini-1.5-flash",
+            "gemini-2.0-flash-exp",
+            "gemini-1.5-pro-latest"
         ]
 
         for model_name in models_to_try:
             try:
+                print(f"[API] 🤖 Trying model: {model_name}")
                 response = litellm.completion(
                     model=model_name,
                     messages=[
@@ -649,9 +645,9 @@ async def generate_readme(request: GenerateReadmeRequest):
         if not os.getenv("GEMINI_API_KEY"):
             return {"readme_content": "# Error: Gemini API Key Missing\n\nPlease set GEMINI_API_KEY in Render environment variables."}
 
-        print(f"[API] 🤖 Calling Gemini for README generation...")
+        print(f"[API] 🤖 Calling Gemini README gen (model: gemini-1.5-flash-latest)")
         response = litellm.completion(
-            model="gemini/gemini-1.5-flash",
+            model="gemini-1.5-flash-latest",
             messages=[
                 {
                     "role": "user",
@@ -737,8 +733,9 @@ Provide the result as a JSON object with:
 
 Output ONLY valid JSON.
 """
+        print(f"[API] 🤖 Comparing READMEs (model: gemini-1.5-flash-latest)")
         analysis_res = litellm.completion(
-            model="gemini/gemini-1.5-flash",
+            model="gemini-1.5-flash-latest",
             messages=[{"role": "user", "content": analysis_prompt}],
             response_format={ "type": "json_object" }
         )
