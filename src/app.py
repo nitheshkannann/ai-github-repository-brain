@@ -156,9 +156,11 @@ def resolve_repo_path(repo_input: str) -> str:
     return repo_input
 
 async def call_gemini(prompt: str, system: str = "") -> str:
-    """Robust Gemini caller with fallback loop and logging."""
-    models = ["gemini-1.5-flash-latest", "gemini-1.5-pro-latest"]
-    last_err = None
+    models = [
+        "gemini/gemini-1.5-flash",
+        "gemini/gemini-1.5-pro",
+        "gemini/gemini-pro"
+    ]
 
     for model in models:
         try:
