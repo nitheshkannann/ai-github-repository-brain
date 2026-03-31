@@ -184,14 +184,10 @@ export default function Home() {
     setLoadLoading(true);
     setLoadError(null);
     setLoadResult(null);
-    const loadingToastId = toast.loading("Indexing repository...");
+    const loadingToastId = toast.loading("Indexing… this can take 1–3 min on Render free tier ☕");
     displayStatus("⚡ Indexing repository...");
     try {
-      const fetchPromise = loadRepo(repoPath.trim());
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Request timeout after 20 seconds")), 20000)
-      );
-      const data = await Promise.race([fetchPromise, timeoutPromise]) as LoadRepoResponse;
+      const data = await loadRepo(repoPath.trim());
       setLoadResult(data);
       handleRepoLoaded(data);
       toast.success("Repository indexed", { id: loadingToastId });
