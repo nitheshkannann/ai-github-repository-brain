@@ -446,7 +446,7 @@ def api_generate_requirements(body: GenerateRequirementsRequest):
 @app.post("/generate_readme", response_model=GenerateReadmeResponse)
 def api_generate_readme(body: GenerateReadmeRequest):
     """
-    Generate a README.md using repository structure and dependencies data.
+    Generate a REAL README.md using repository structure and code context via Gemini LLM.
     """
     try:
         repo = body.repo_path.strip()
@@ -459,104 +459,59 @@ def api_generate_readme(body: GenerateReadmeRequest):
         if not Path(repo).exists():
             raise HTTPException(status_code=400, detail=f"Path does not exist: {repo}")
 
-        logger.info("Generating README...")
-        print("Generating README...")
-
-        # Step 1: Use repo_parser -> get files
+        logger.info(f"Generating REAL README for {repo}...")
+        
+        # Step 1: Scan files for structure
         files = get_code_files(repo)
-        
-        # Step 2 & 3: Use dependency_analyzer -> get deps & entry points
-        req_data = generate_requirements(repo)
+        if not files:
+            raise HTTPException(status_code=400, detail="No code files found in repository.")
+            
+        # Step 2: Use actual code chunks for deep context
+        chunks = chunk_code_files(files[:50]) # Use first 50 files for speed/RAM
+        context_chunks = chunks[:25] # Sample 25 chunks for LLM
+        context = "\n\n".join([f"File: {c['file_path']}\nContent:\n{c['content'][:1000]}" for c in context_chunks])
 
-        # Step 4: Build structured context
-        file_tree = []
-        for f in files[:50]: # Limit to 50 files for context fitting
-            file_tree.append(f['path'])
-        
-        context_data = {
-            "files": file_tree,
-            "dependencies": {
-                "python": req_data.get("python", []),
-                "javascript": req_data.get("javascript", [])
-            },
-            "entry_points": req_data.get("entry_points", {})
-        }
+        # Step 3: Build folder structure
+        unique_files = list({f['path'] for f in files})
+        folder_structure = "\n".join([f"  - {f}" for f in unique_files[:50]])
 
-        # Step 5: Send to LLM with prompt
+        # Step 4: Call LLM (Gemini)
         project_name = Path(repo).name
+        print(f"[API] 🤖 Generating README for {project_name}...")
+        
+        sys_prompt = (
+            "You are a senior software engineer and technical writer. "
+            "Your task is to generate a comprehensive, professional README.md for a GitHub repository. "
+            "Use markdown formatting with emojis for headers. Do NOT include placeholder text."
+        )
 
-        # Derive insights
-        python_deps = req_data.get("python", [])
-        js_deps = req_data.get("javascript", [])
-        entry_points = req_data.get("entry_points", {})
-        languages = []
-        if python_deps: languages.append("Python")
-        if js_deps: languages.append("JavaScript")
-        key_files = [f for f in file_tree if any(f.endswith(x) for x in ["main.py", "app.py", "index.js", "index.ts", "server.py", "main.js"])][:10]
-        folder_summary = {}
-        for f in file_tree:
-            top = f.split("/")[0]
-            folder_summary.setdefault(top, 0)
-            folder_summary[top] += 1
-        folder_lines = [f"- {folder}/ ({cnt} files)" for folder, cnt in sorted(folder_summary.items())[:10]]
+        user_prompt = f"""Generate a high-quality README.md for the repository '{project_name}'.
 
-        # Framework-specific guidance
-        framework_hints = []
-        if "fastapi" in python_deps:
-            framework_hints.append("This appears to be a FastAPI web API.")
-        if "flask" in python_deps:
-            framework_hints.append("This appears to be a Flask web application.")
-        if "react" in js_deps:
-            framework_hints.append("This appears to use React for the frontend.")
-        if "next" in js_deps or "next.js" in js_deps:
-            framework_hints.append("This appears to be a Next.js application.")
-        if "express" in js_deps:
-            framework_hints.append("This appears to be an Express.js backend.")
-        if "django" in python_deps:
-            framework_hints.append("This appears to be a Django web application.")
+Folder Structure:
+{folder_structure}
 
-        sys_prompt = "You are an expert software engineer and technical writer. Write a professional, GitHub-ready README.md that is specific to the provided project data. Do NOT hallucinate technologies not present. Avoid generic boilerplate about FAISS, chunking, or LLMs unless the repository actually contains such code."
+Key Code Context:
+{context}
 
-        user_prompt = f"""Generate a high-quality, professional README.md for this repository using ONLY the data provided.
-
-Project Name: {project_name}
-Detected Languages: {', '.join(languages) if languages else 'None'}
-Key Files: {', '.join(key_files) if key_files else 'None'}
-Dependencies:
-- Python: {', '.join(python_deps[:10]) if python_deps else 'None'}
-- JavaScript: {', '.join(js_deps[:10]) if js_deps else 'None'}
-Entry Points: {entry_points}
-Project Structure (top folders):
-{chr(10).join(folder_lines) if folder_lines else 'None'}
-
-Framework insights:
-{chr(10).join(f"- {hint}" for hint in framework_hints) if framework_hints else 'None'}
-
-Instructions:
-- Title: "# {project_name}"
-- Write a concise Overview reflecting the actual files and dependencies.
-- If Python is present, include an Installation section with pip/requirements.txt.
-- If JavaScript is present, include an Installation section with npm.
-- If both are present, include both.
-- Include a Usage section that references detected entry points (e.g. python src/app.py, npm start, etc.).
-- Include a Project Structure section listing the top folders shown above.
-- Include a Features section based on detected dependencies and purpose (e.g., API, web app, CLI tool).
-- If a framework is hinted, tailor the explanation accordingly (e.g., FastAPI routes, React components, Express endpoints).
-- Do NOT include generic sections like "FAISS, chunking, embeddings" unless explicitly present in the repo.
-- Keep the tone professional and specific to this project.
-
-Output ONLY clean markdown compatible with GitHub README.md. Do not wrap in ```markdown."""
+Include:
+1. Title & Badges
+2. Detailed Overview
+3. Core Features
+4. Tech Stack (languages, frameworks)
+5. Step-by-step Installation & Setup
+6. Usage Examples
+7. File Structure
+8. License (MIT)
+"""
 
         models_to_try = [
-            "gemini/gemini-2.5-flash",
             "gemini/gemini-2.0-flash",
             "gemini/gemini-1.5-flash",
-            "gemini/gemini-1.5-flash-latest",
             "gemini/gemini-1.5-pro",
         ]
         
-        readme_content: Optional[str] = None
-        last_error: Optional[Exception] = None
+        readme_content = None
+        last_error = None
 
         for model_name in models_to_try:
             try:
@@ -566,6 +521,7 @@ Output ONLY clean markdown compatible with GitHub README.md. Do not wrap in ```m
                         {"role": "system", "content": sys_prompt},
                         {"role": "user", "content": user_prompt},
                     ],
+                    max_tokens=3000
                 )
                 readme_content = response.choices[0].message.content
                 break
@@ -573,24 +529,9 @@ Output ONLY clean markdown compatible with GitHub README.md. Do not wrap in ```m
                 last_error = e
                 continue
 
-        if not readme_content:
-            readme_content = (
-                f"# Error Generating README\n\n"
-                f"[LLM Error: {last_error}]\n"
-                "Make sure GEMINI_API_KEY is set in your .env file."
-            )
-            
-        # Optional: remove ```markdown and ``` wrappers if present
-        if readme_content.startswith("```markdown"):
-            readme_content = readme_content[len("```markdown"):].strip()
-            if readme_content.endswith("```"):
-                readme_content = readme_content[:-3].strip()
-        elif readme_content.startswith("```"):
-            readme_content = readme_content[len("```"):].strip()
-            if readme_content.endswith("```"):
-                readme_content = readme_content[:-3].strip()
+        if not readme_content or len(readme_content.strip()) < 100:
+            return GenerateReadmeResponse(readme_content="# README Generation Failed\n\nPlease check your API key or repo content.")
 
-        # Step 6: Return markdown string
         return GenerateReadmeResponse(readme_content=readme_content)
 
     except HTTPException:

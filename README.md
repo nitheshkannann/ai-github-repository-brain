@@ -1,6 +1,5 @@
 <div align="center">
 
-![Header Image](file:///C:/Users/nithe/.gemini/antigravity/brain/213b69f1-7fbf-4c3c-9dd6-fd572ebff2fd/hero_brain_code_analysis_1774917424408.png)
 
 # 🧠 AI GitHub Repository Brain
 ### The Cinematic 3D Code Explorer — Intelligence, Re-imagined.
@@ -111,7 +110,6 @@ To ensure stability on cloud environments with tight memory constraints (like Re
 
 ## 🎮 UI/UX: Cinematic 3D
 
-![Frontend Screenshot](file:///C:/Users/nithe/.gemini/antigravity/brain/213b69f1-7fbf-4c3c-9dd6-fd572ebff2fd/vercel_deployment_view_1774915507382.png)
 
 The application features a premium **Glassmorphism Design System** built with **Next.js 14** and **Tailwind CSS**.
 - **Neural Particle Background:** An interactive canvas that reacts to mouse movements and "pulses" when the AI is thinking.
@@ -123,9 +121,6 @@ The application features a premium **Glassmorphism Design System** built with **
 
 ## 🔌 Webhook Idea: "Brainhook"
 
-<div align="center">
-<img src="file:///C:/Users/nithe/.gemini/antigravity/brain/213b69f1-7fbf-4c3c-9dd6-fd572ebff2fd/brainhook_automation_logo_1774917443430.png" width="200" alt="Brainhook Logo" />
-</div>
 
 > [!TIP]
 > **Documentation that lives and breathes with your code.**
