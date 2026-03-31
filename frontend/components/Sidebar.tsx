@@ -407,7 +407,7 @@ export default function Sidebar({
 
             {/* Footer */}
             <div className="mt-auto text-xs text-slate-700 text-center">
-                Powered by Gemini · FAISS
+                Powered by Gemini · Keyword-Search
             </div>
 
             {/* README Modal */}

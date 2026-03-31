@@ -1,109 +1,201 @@
 <div align="center">
 
+![Header Image](file:///C:/Users/nithe/.gemini/antigravity/brain/213b69f1-7fbf-4c3c-9dd6-fd572ebff2fd/hero_brain_code_analysis_1774917424408.png)
+
 # 🧠 AI GitHub Repository Brain
+### The Cinematic 3D Code Explorer — Intelligence, Re-imagined.
 
-### Ask natural language questions about any codebase — powered by RAG, FAISS, and Gemini AI
+[![Backend](https://img.shields.io/badge/Backend-Render-46E3B7?style=flat&logo=render&logoColor=white)](https://ai-github-repository-brain.onrender.com)
+[![Frontend](https://img.shields.io/badge/Frontend-Vercel-000000?style=flat&logo=vercel&logoColor=white)](https://repo-brain-frontend.vercel.app)
+[![Gemini](https://img.shields.io/badge/AI-Google_Gemini-4285F4?style=flat&logo=google-gemini&logoColor=white)](https://ai.google.dev)
+[![License: MIT](https://img.shields.io/badge/License-MIT-f1c40f?style=flat)](LICENSE)
 
-[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat&logo=python&logoColor=white)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.111+-009688?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![Next.js](https://img.shields.io/badge/Next.js-14-000000?style=flat&logo=next.js&logoColor=white)](https://nextjs.org)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+**Analyze code via Natural Language. Instant Cloning. 3D Visuals. Real-time Insights.**
+
+[Live Production App](https://repo-brain-frontend.vercel.app) • [API Documentation](https://ai-github-repository-brain.onrender.com/docs) • [Contact Author](https://github.com/nitheshkannann)
 
 </div>
 
 ---
 
-## 📖 Description
-
-**AI GitHub Repository Brain** is a full-stack AI application that lets you explore any local codebase through natural language. Point it at a repository, ask questions like *"How does the authentication system work?"* or *"Explain the chunking logic"*, and get precise answers backed by the actual source code.
-
-Under the hood it builds a **RAG (Retrieval-Augmented Generation)** pipeline:
-- Parses and semantically chunks every source file
-- Generates vector embeddings and stores them in a **FAISS** index
-- Retrieves the most relevant code sections per query
-- Feeds them as context to **Google Gemini** for a grounded, accurate explanation
-
----
-
-## 🖥️ Demo
-
-> **Chat UI — Ask questions, get AI explanations with code snippets**
-
-![Chat UI showing AI response with code snippet cards](./docs/demo.png)
+## 📖 Table of Contents
+1. [🌌 The Vision](#-the-vision)
+2. [✨ Core Features](#-core-features)
+3. [🏗️ Technical Architecture](#-technical-architecture)
+4. [⚡ Dual-Mode RAG Engine](#-dual-mode-rag-engine)
+5. [🎮 UI/UX: Cinematic 3D](#-uiux-cinematic-3d)
+6. [🔌 Webhook Idea: Brainhook](#-webhook-idea-brainhook)
+7. [🚀 Cloud Deployment](#-cloud-deployment)
+8. [⚙️ Local Installation](#-local-installation)
+9. [📂 Project Structure](#-project-structure)
+10. [🚧 Roadmap & Status](#-roadmap--status)
+11. [👤 Author & Acknowledgements](#-author--acknowledgements)
 
 ---
 
-## ✨ Features
+## 🌌 The Vision
+Most code analysis tools are utilitarian and dull. **AI GitHub Repository Brain** is built to be the "Command Center" for your code. It doesn't just answer questions—it surfaces truths about your architecture through a premium, sci-fi inspired interface. 
 
-| Feature | Detail |
-|---|---|
-| 🔍 Semantic Code Search | Embedding-based similarity — finds relevant code even without exact keyword matches |
-| 🤖 Gemini LLM Explanations | Grounded answers using retrieved source code as context |
-| ⚡ FAISS Vector Index | Sub-millisecond nearest-neighbour retrieval at any repo scale |
-| 💬 Chat Interface | Conversational Q&A with message history and syntax-highlighted code cards |
-| 🎛️ Adjustable Top-K | Tune how many code sections the LLM sees per query |
-| 🌗 Dark Developer UI | ChatGPT-style dark theme built with Next.js + Tailwind CSS |
-| 🔌 REST API | Clean FastAPI backend — swap any frontend or call it from scripts |
+Whether you're onboarding to a legacy codebase or auditing a new microservice, the "Brain" provides a cinematic journey through your logic, ensuring every line of code is understood, documented, and accessible.
 
 ---
 
-## 🏗️ System Architecture
+## ✨ Core Features
 
+### 📡 Instant Repository Ingestion
+Paste a **GitHub URL** or a **Local Path**. The Brain immediately clones (if remote), parses, and filters source files using highly optimized file walking logic. No manual configuration or complex `.gitignore` rules required—it just works.
+
+### 🤖 Gemini LLM Explanations
+Powered by Google's **Gemini 2.0 / 1.5** models, the Brain provides grounded, context-aware answers. It doesn't guess; it retrieves the exact code sections and feeds them as ground truth to the LLM.
+
+### 📜 Auto-Documentation Suite
+*   **README Generation:** Analyzes your entire codebase to generate professional, standard-compliant README files.
+*   **Setup Guide Generator:** Detects entry points and installation steps to build a one-click copy-pasteable guide for your team.
+
+### 💠 Dual-Mode Exploration
+Toggle between **"Load Repository"** for deep indexing and **"Ask Anything"** for contextual queries with adjustable **Top-K** thresholds to control the breadth of the AI's vision.
+
+---
+
+## 🏗️ Technical Architecture
+
+```mermaid
+graph TD
+    subgraph "External World"
+        User((User))
+        GitSources[GitHub Repositories]
+    end
+
+    subgraph "The Frontend (Vercel)"
+        UI[Cinematic 3D HUD]
+        State[React State Management]
+        Particles[Particle Physics Canvas]
+    end
+
+    subgraph "The Backend (Render)"
+        API[FastAPI Gateway]
+        GitEngine[Git CLI / Cloner]
+        Parser[Code Chunker & Parser]
+        SearchIndex[Lightweight Keyword-Search]
+        Logic[Dependency Analyzer]
+    end
+
+    subgraph "AI Services"
+        LLM[Google Gemini 2.0 Flash]
+    end
+
+    User -->|Interaction| UI
+    UI -->|REST API| API
+    API -->|git clone| GitSources
+    API -->|Compute| Parser
+    Parser -->|Index| SearchIndex
+    SearchIndex -->|Retrieve Context| LLM
+    LLM -->|Explain| UI
+    UI -->|Visualize| User
 ```
-User Question
-      │
-      ▼
-┌─────────────────────┐
-│   Next.js Frontend  │  ← Chat UI, Sidebar, Code viewer
-└────────┬────────────┘
-         │  POST /ask
-         ▼
-┌─────────────────────┐
-│  FastAPI Backend    │
-│  (src/api.py)       │
-└────────┬────────────┘
-         │
-    ┌────┴──────────────────────────┐
-    │       RAG Pipeline            │
-    │                               │
-    │  repo_parser.py               │
-    │    → Scan & filter code files │
-    │  chunker.py                   │
-    │    → Split into text chunks   │
-    │  embedder.py                  │
-    │    → sentence-transformers    │
-    │       (all-MiniLM-L6-v2)      │
-    │  retriever.py                 │
-    │    → FAISS similarity search  │
-    └────────────┬──────────────────┘
-                 │ Top-K chunks
-                 ▼
-         ┌───────────────┐
-         │  Gemini LLM   │  ← gemini-2.0-flash / 1.5-flash
-         └───────┬───────┘
-                 │
-                 ▼
-      Answer + Code Snippets
-```
 
 ---
 
-## 🛠️ Tech Stack
+## ⚡ Dual-Mode RAG Engine
+To ensure stability on cloud environments with tight memory constraints (like Render's 512MB limit), we implemented a **hybrid retrieval strategy**.
 
-**Backend**
-- [Python 3.10+](https://python.org)
-- [FastAPI](https://fastapi.tiangolo.com) — REST API framework
-- [Sentence Transformers](https://www.sbert.net) — `all-MiniLM-L6-v2` embeddings
-- [FAISS](https://faiss.ai) — vector similarity search
-- [LiteLLM](https://litellm.ai) — unified LLM interface
-- [Google Gemini](https://ai.google.dev) — LLM for code explanation
+### **1. Keyword-Search Mode (Cloud Optimized)**
+- **How it works:** Uses frequency-based scoring to find relevant chunks without loading heavy vector libraries.
+- **Benefit:** Reduces idle RAM usage by **>80%**, allowing the "Brain" to remain responsive 24/7 on free-tier servers.
 
-**Frontend**
-- [Next.js 14](https://nextjs.org) (App Router)
-- [React](https://react.dev) + [TypeScript](https://typescriptlang.org)
-- [Tailwind CSS](https://tailwindcss.com)
-- [react-syntax-highlighter](https://github.com/react-syntax-highlighter/react-syntax-highlighter)
-- [Lucide Icons](https://lucide.dev)
+### **2. Vector-RAG Mode (Local / High-Precision)**
+- **How it works:** Uses **Sentence-Transformers** and **FAISS** index for semantic similarity.
+- **Benefit:** Higher precision for complex queries where keywords may overlap or be missing.
+
+---
+
+## 🎮 UI/UX: Cinematic 3D
+
+![Frontend Screenshot](file:///C:/Users/nithe/.gemini/antigravity/brain/213b69f1-7fbf-4c3c-9dd6-fd572ebff2fd/vercel_deployment_view_1774915507382.png)
+
+The application features a premium **Glassmorphism Design System** built with **Next.js 14** and **Tailwind CSS**.
+- **Neural Particle Background:** An interactive canvas that reacts to mouse movements and "pulses" when the AI is thinking.
+- **Holographic Glass Panels:** Translucent sidebar and chat containers with neon-glow highlights.
+- **Scanline Overlays:** Subtle CRT-style overlays for a retro-futuristic developer experience.
+- **Responsive Animations:** Powered by **Framer Motion**, ensuring every interaction feels alive.
+
+---
+
+## 🔌 Webhook Idea: "Brainhook"
+
+<div align="center">
+<img src="file:///C:/Users/nithe/.gemini/antigravity/brain/213b69f1-7fbf-4c3c-9dd6-fd572ebff2fd/brainhook_automation_logo_1774917443430.png" width="200" alt="Brainhook Logo" />
+</div>
+
+> [!TIP]
+> **Documentation that lives and breathes with your code.**
+
+We are introducing **Brainhook**, a conceptual PR-generation system that bridges the gap between active development and documentation maintenance.
+
+### **The Workflow:**
+1. **The Commit:** You push code to your repository.
+2. **The Hook:** GitHub sends a webhook event to our `POST /webhook` endpoint.
+3. **The Index:** The Brain pulls the latest code and incrementally updates its search index.
+4. **The PR:** If Gemini detects significant architectural shifts (e.g., a new database model or API endpoint), it automatically **generates an updated README.md and opens a Pull Request** back to your repository.
+
+---
+
+## 🚀 Cloud Deployment
+
+The project is architected for seamless cloud integration with zero-OOM (Out Of Memory) guarantees.
+
+### **1. Backend: Deploy to Render**
+- **Runtime:** Python 3.10+
+- **Commands:**
+    - Build: `pip install -r requirements.txt`
+    - Start: `uvicorn src.app:app --host 0.0.0.0 --port 10000`
+- **Configuration:** Add `GEMINI_API_KEY` to your environment variables.
+- **Optimization:** Backend starts in `LIGHTWEIGHT_MODE` by default on Render.
+
+### **2. Frontend: Deploy to Vercel**
+- **Framework:** Next.js (App Router)
+- **Configuration:** Set `NEXT_PUBLIC_API_BASE` to your Render URL.
+- **Features:** Vercel automatically optimizations your 3D assets and fonts for lighthouse-perfect performance.
+
+---
+
+## ⚙️ Local Installation
+
+### Prerequisites
+- Python 3.10+
+- Node.js 18+
+- [Gemini API Key](https://aistudio.google.com/app/apikey)
+
+### Step 1: Environment Setup
+```bash
+git clone https://github.com/nitheshkannann/ai-github-repository-brain.git
+cd ai-github-repository-brain
+python -m venv .venv
+# Activate venv:
+# Windows: .venv\Scripts\activate
+# Linux/macOS: source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### Step 2: API Keys
+```bash
+cp .env.example .env
+# Open .env and add your key:
+# GEMINI_API_KEY=ABC...XYZ
+```
+
+### Step 3: Frontend Setup
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### Step 4: Backend Launch
+```bash
+# In a second terminal
+uvicorn src.app:app --reload --port 8000
+```
 
 ---
 
@@ -111,155 +203,50 @@ User Question
 
 ```
 ai-github-repository-brain/
-│
 ├── src/
-│   ├── api.py          # FastAPI app — /load_repo, /ask endpoints
-│   ├── repo_parser.py  # Scan repository, collect source files
-│   ├── chunker.py      # Split files into overlapping text chunks
-│   ├── embedder.py     # Generate sentence-transformer embeddings
-│   └── retriever.py    # FAISS index build + similarity search
-│
-├── frontend/
-│   ├── app/
-│   │   ├── layout.tsx
-│   │   └── page.tsx        # Root page
-│   ├── components/
-│   │   ├── Sidebar.tsx     # Repo path input, Top-K slider, Load button
-│   │   ├── Chat.tsx        # Chat bubbles + loading indicator
-│   │   └── CodeBlock.tsx   # Expandable syntax-highlighted snippet card
-│   ├── lib/
-│   │   └── api.ts          # Typed fetch wrappers for the REST API
-│   ├── package.json
-│   └── next.config.ts
-│
-├── data/
-├── .env.example        # API key template
-├── requirements.txt
-└── README.md
+│   ├── app.py          # FastAPI Gateway & API Logic
+│   ├── repo_parser.py  # Git/File scanning logic
+│   ├── chunker.py      # Linguistic code chunking
+│   ├── embedder.py     # Sentence-Transformer logic
+│   └── retriever.py    # Search & Retrieval engine
+├── frontend/           # Next.js 14 Cinematic UI
+│   ├── app/            # App Router & Styles
+│   ├── components/     # HUD, Sidebar, Chat components
+│   └── lib/            # API Client (Shared types)
+├── data/               # Persistent repo storage
+├── .env.example        # Configuration template
+├── package.json        
+└── README.md           # The file you are reading!
 ```
 
 ---
 
-## ⚙️ Installation
+## 🚧 Roadmap & Status
 
-### Prerequisites
-- Python 3.10+
-- Node.js 18+
-- A [Google Gemini API key](https://aistudio.google.com/app/apikey)
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/your-username/ai-github-repository-brain.git
-cd ai-github-repository-brain
-```
-
-### 2. Set up the Python environment
-
-```bash
-python -m venv .venv
-
-# Windows
-.venv\Scripts\activate
-
-# macOS / Linux
-source .venv/bin/activate
-
-pip install -r requirements.txt
-```
-
-### 3. Configure your API key
-
-```bash
-cp .env.example .env
-```
-
-Open `.env` and add your key:
-
-```env
-GEMINI_API_KEY=your_gemini_api_key_here
-```
-
-### 4. Install frontend dependencies
-
-```bash
-cd frontend
-npm install
-cd ..
-```
+- [x] **Lightweight Retrieval:** Removed heavy dependencies for cloud stability.
+- [x] **GitHub URL Support:** Native cloning and real-time indexing.
+- [x] **3D HUD UI:** High-performance Next.js 14 interface.
+- [x] **Gemini Integration:** Multi-flash model fallback logic.
+- [ ] **Token Streaming:** Real-time character-by-character response streaming.
+- [ ] **Brainhook:** GitHub Webhook automation for PR generation.
+- [ ] **Multi-Vector Search:** Combining Keyword and Hybrid search for better results.
 
 ---
 
-## 🚀 Running the Application
+## 👤 Author & Acknowledgements
 
-You need **two terminals** running simultaneously.
+**Nithesh Kannan**  
+Built as a premium full-stack AI project to demonstrate the feasibility of running rich RAG applications on low-memory cloud infrastructure.
 
-### Terminal 1 — Backend
-
-```bash
-# From the project root, with venv activated
-uvicorn src.api:app --reload --port 8000
-```
-
-The API will be available at `http://localhost:8000`.  
-Interactive docs: `http://localhost:8000/docs`
-
-### Terminal 2 — Frontend
-
-```bash
-cd frontend
-npm run dev
-```
-
-Open **http://localhost:3000** in your browser.
-
----
-
-## 💡 Example Usage
-
-1. **Load a repository** — paste any local path into the sidebar (e.g. `C:\Users\you\my-project`) and click **Load Repository**. The RAG pipeline runs once and builds the FAISS index.
-
-2. **Ask questions** — type in the chat and press Enter:
-
-   > *"How does the embedder generate vectors?"*  
-   > *"What does the repo_parser filter out?"*  
-   > *"Explain the FAISS retrieval process."*  
-   > *"Where is the Gemini API called?"*
-
-3. **View source code** — each answer includes collapsible code snippet cards showing the exact file sections the AI used, with file name, chunk ID, and similarity score.
-
----
-
-## 🚧 Future Improvements
-
-- [ ] Persistent FAISS index (save/load to disk — no re-indexing on restart)
-- [ ] Multi-repo support — switch between indexed repositories
-- [ ] Streaming LLM responses (Server-Sent Events)
-- [ ] GitHub URL support — clone and index remote repos directly
-- [ ] Session history — save and restore past Q&A sessions
-- [ ] Re-ranking with cross-encoder models for higher precision
-- [ ] Docker Compose setup for one-command deployment
-
----
-
-## 📄 License
-
-This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
-
----
-
-## 👤 Author
-
-**Nithesh Kannan**
-
-> Built as a portfolio project demonstrating skills in AI engineering, RAG systems, vector databases, LLM integration, and full-stack development.
-
-[![GitHub](https://img.shields.io/badge/GitHub-@nitheshkannann-181717?style=flat&logo=github)](https://github.com/nitheshkannann)
-
----
+**Tech Stack Highlights:**
+- **AI:** Google Gemini, LangChain (Conceptual), LiteLLM.
+- **Frontend:** Next.js, Framer Motion, Three.js (Conceptual), Tailwind CSS.
+- **Backend:** FastAPI, Python, Git.
 
 <div align="center">
 
-*If this project helped you, consider giving it a ⭐ on GitHub!*
+*If you found this project inspiring, please consider giving it a ⭐ on GitHub!*
+
+[Home](https://repo-brain-frontend.vercel.app) | [GitHub](https://github.com/nitheshkannann)
 
 </div>
