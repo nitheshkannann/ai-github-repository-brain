@@ -613,11 +613,92 @@ async def generate_requirements(request: GenerateRequirementsRequest):
 
 @app.post("/generate_readme", response_model=GenerateReadmeResponse)
 async def generate_readme(request: GenerateReadmeRequest):
-    """Generate README for repository."""
+    """Generate a REAL README for the repository using repo context and Gemini LLM."""
     try:
         print(f"[API] POST /generate_readme - {request.repo_path}")
-        # Placeholder implementation
-        return {"readme_content": "# README\n\nPlaceholder content"}
+        
+        # ── Step 1: Check API Key ──────────────────────────────────────────
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            print("WARNING: GEMINI_API_KEY is missing!")
+            # We don't necessarily fail here, as litellm might find it in .env,
+            # but we log it as requested.
+
+        # ── Step 2: Resolve Repo and Data ───────────────────────────────
+        try:
+            repo_path = resolve_repo_path(request.repo_path.strip())
+            repo_name = os.path.basename(repo_path.rstrip("/\\"))
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid repository path: {str(e)}")
+
+        # Get chunks from cache if possible, or parse fresh
+        if repo_path in _pipeline_cache:
+            chunks = _pipeline_cache[repo_path]
+            print(f"[API] ✓ Using cached chunks for {repo_name}")
+        else:
+            print(f"[API] Parse required for README: {repo_name}")
+            files = get_code_files(repo_path)
+            # Safety cap for large repos
+            files = files[:30]
+            chunks = chunk_code_files(files)
+            # Optionally cache it? Let's stay minimal for now.
+
+        if not chunks:
+            raise HTTPException(status_code=400, detail="Could not find any code to analyze.")
+
+        # Build context from first 20 chunks as requested
+        context_chunks = chunks[:20]
+        context = "\n\n".join([f"File: {c['file_path']}\nContent:\n{c['content']}" for c in context_chunks])
+        
+        # Folder structure summary
+        unique_files = list({c["file_path"] for c in chunks})
+        folder_structure = "\n".join([f"  - {f}" for f in unique_files[:30]])
+
+        # ── Step 3: LLM Call ──────────────────────────────────────────────
+        print(f"[API] 🤖 Generating README for {repo_name}...")
+        
+        prompt = f"""
+Generate a professional README.md for this repository named '{repo_name}'.
+
+Include:
+- Project title
+- Description (what it does)
+- Features
+- Tech stack
+- Installation steps
+- Usage
+- Folder structure
+
+Folder Structure:
+{folder_structure}
+
+Code context:
+{context}
+"""
+        
+        try:
+            response = litellm.completion(
+                model="gemini/gemini-1.5-flash",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=2048
+            )
+            readme = response['choices'][0]['message']['content']
+        except Exception as e:
+            print(f"[API] ✗ LLM Call failed: {e}")
+            raise HTTPException(status_code=500, detail=f"LLM Error: {str(e)}")
+
+        # ── Step 4: Safety Fallback ─────────────────────────────────────────
+        if not readme or len(readme.strip()) < 50:
+            print("[API] ✗ README generation produced too little content.")
+            return {"readme_content": "# README Generation Failed\n\nPlease check your API key and repository content."}
+
+        # ── Step 5: Debug Logs ──────────────────────────────────────────────
+        print("README GENERATED:", readme[:200].replace("\n", " ") + "...")
+
+        return {"readme_content": readme}
+
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"[API] ✗ Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
